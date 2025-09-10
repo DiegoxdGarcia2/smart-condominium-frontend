@@ -1,36 +1,22 @@
+// external imports
 import { Navigate, Outlet } from 'react-router-dom';
 
-import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
-
+// internal imports
 import { useAuth } from '../context/AuthContext';
 
-// Componente de carga
-const LoadingSpinner = () => (
-  <Box
-    sx={{
-      display: 'flex',
-      flex: '1 1 auto',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-    }}
-  >
-    <CircularProgress />
-  </Box>
-);
+// ----------------------------------------------------------------------
 
-// Wrapper de ruta privada
-const ProtectedRoute = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+export default function ProtectedRoute() {
+  const { isAuthenticated } = useAuth();
 
-  // Mientras se verifica la sesión, mostrar loading
-  if (isLoading) {
-    return <LoadingSpinner />;
+  console.log('%c[DEBUG] ProtectedRoute check:', 'color: #9C27B0', { isAuthenticated });
+
+  // Ya no necesitamos verificar isInitialized aquí porque AuthLoader ya se encargó
+  if (!isAuthenticated) {
+    console.log('%c[DEBUG] Not authenticated, redirecting to login', 'color: #f44336');
+    return <Navigate to="/sign-in" replace />;
   }
 
-  // Una vez verificada la sesión, decidir si mostrar contenido o redirigir
-  return isAuthenticated ? <Outlet /> : <Navigate to="/sign-in" replace />;
-};
-
-export default ProtectedRoute;
+  console.log('%c[DEBUG] Authenticated, rendering protected content', 'color: #4CAF50');
+  return <Outlet />;
+}
