@@ -14,10 +14,16 @@ import MenuItem, { menuItemClasses } from '@mui/material/MenuItem';
 
 import { useRouter, usePathname } from 'src/routes/hooks';
 
-import { _myAccount } from 'src/_mock';
 import { useAuth } from 'src/context/AuthContext';
 
 // ----------------------------------------------------------------------
+
+// Mock data local
+const _myAccount = {
+  displayName: 'Usuario Smart',
+  email: 'usuario@smartcondominium.com',
+  photoURL: '/assets/images/avatar/avatar-25.webp',
+};
 
 export type AccountPopoverProps = IconButtonProps & {
   data?: {
