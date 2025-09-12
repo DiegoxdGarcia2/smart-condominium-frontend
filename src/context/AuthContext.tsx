@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useContext, useCallback, createContext } from 'react';
 
 import api from '../services/api';
 
@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, [refreshToken, refreshAccessToken]);
 
   const login = useCallback(async ({ email, password }: { email: string; password: string }) => {
-    const payload = { email: email, password };
+    const payload = { email, password };
     const { data } = await api.post('/token/', payload);
     const access = data?.access;
     const refresh = data?.refresh;

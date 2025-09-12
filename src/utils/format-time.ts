@@ -81,6 +81,19 @@ export function fDate(date: DatePickerFormat, template?: string): string {
 // ----------------------------------------------------------------------
 
 /**
+ * @output 12:30 PM
+ */
+export function fTime(date: DatePickerFormat, template?: string): string {
+  if (!isValidDate(date)) {
+    return 'Invalid time';
+  }
+
+  return dayjs(date).format(template ?? 'h:mm A');
+}
+
+// ----------------------------------------------------------------------
+
+/**
  * @output a few seconds, 2 years
  */
 export function fToNow(date: DatePickerFormat): string {

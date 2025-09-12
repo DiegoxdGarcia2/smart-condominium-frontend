@@ -7,15 +7,20 @@ import { varAlpha } from 'minimal-shared/utils';
 import Box from '@mui/material/Box';
 import LinearProgress, { linearProgressClasses } from '@mui/material/LinearProgress';
 
+// layout imports
 import { AuthLayout } from 'src/layouts/auth';
 import { DashboardLayout } from 'src/layouts/dashboard';
 
+// local imports
 import ProtectedRoute from './ProtectedRoute';
 
 // ----------------------------------------------------------------------
 
 export const DashboardPage = lazy(() => import('src/pages/dashboard'));
 export const AnnouncementsPage = lazy(() => import('src/pages/announcements'));
+export const CommonAreasPage = lazy(() => import('src/pages/common-areas'));
+export const FinancesPage = lazy(() => import('src/pages/finances'));
+export const ReservationsPage = lazy(() => import('src/pages/reservations'));
 export const SignInPage = lazy(() => import('src/pages/sign-in'));
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
 
@@ -54,6 +59,9 @@ export const routesSection: RouteObject[] = [
         children: [
           { index: true, element: <DashboardPage /> },
           { path: 'announcements', element: <AnnouncementsPage /> },
+          { path: 'common-areas', element: <CommonAreasPage /> },
+          { path: 'finances', element: <FinancesPage /> },
+          { path: 'reservations', element: <ReservationsPage /> },
         ],
       },
     ],

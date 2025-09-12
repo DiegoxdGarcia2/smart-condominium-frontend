@@ -28,6 +28,16 @@ export const navData = [
     icon: icon('ic-cart'),
   },
   {
+    title: 'Áreas Comunes',
+    path: '/common-areas',
+    icon: icon('ic-analytics'),
+  },
+  {
+    title: 'Reservas',
+    path: '/reservations',
+    icon: icon('ic-blog'),
+  },
+  {
     title: 'Usuarios',
     path: '/users',
     icon: icon('ic-user'),

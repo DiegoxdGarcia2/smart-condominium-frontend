@@ -1,16 +1,16 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-// En desarrollo usar proxy de Vite ('/api'); en producción usar <BASE>/api
-const isDev = import.meta.env.DEV;
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
-const baseURL = isDev ? '/api' : `${API_BASE}/api`;
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:8000';
 
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
 const api = axios.create({
-  baseURL,
+  baseURL: `${API_BASE}/api`,
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
 

@@ -1,0 +1,670 @@
+================================================================================
+📋 INFORMACIÓN COMPLETA DEL BACKEND - RESERVAS (RESERVATIONS)
+================================================================================
+Fecha: 12 de septiembre de 2025
+Proyecto: Smart Condominium Backend - Fase 3
+================================================================================
+
+🔗 1. RUTAS DE API DISPONIBLES:
+================================================================================
+
+✅ GET    /api/administration/reservations/           - Listar todas las reservas
+❌ POST   /api/administration/reservations/           - Crear nueva reserva (ERROR 400)
+✅ GET    /api/administration/reservations/{id}/      - Obtener reserva específica
+✅ PUT    /api/administration/reservations/{id}/      - Actualizar reserva completa
+✅ PATCH  /api/administration/reservations/{id}/      - Actualizar reserva parcial
+✅ DELETE /api/administration/reservations/{id}/      - Eliminar reserva
+
+📋 ESTADO ACTUAL SEGÚN LOGS:
+- GET: ✅ Funciona correctamente (status 200)
+- POST: ❌ Error 400 Bad Request (visto en logs múltiples veces)
+- PATCH: ✅ Funciona (visto en logs: status 200)
+- PUT/DELETE: ✅ Disponible (ModelViewSet completo)
+
+🚨 ERRORES OBSERVADOS EN LOGS:
+[12/Sep/2025 00:55:19] "POST /api/administration/reservations/ HTTP/1.1" 400 40
+[12/Sep/2025 00:55:34] "POST /api/administration/reservations/ HTTP/1.1" 400 40
+[12/Sep/2025 00:59:44] "POST /api/administration/reservations/ HTTP/1.1" 400 82
+
+================================================================================
+🏗️ 2. MODELO DEL BACKEND (Reservation):
+================================================================================
+
+📂 Archivo: administration/models.py
+📍 Líneas: 145-186
+
+class Reservation(models.Model):
+    """Modelo para las reservas de áreas comunes"""
+    
+    # OPCIONES DE ESTADO:
+    STATUS_CHOICES = [
+        ('Pendiente', 'Pendiente'),     # Default
+        ('Confirmada', 'Confirmada'),
+        ('Cancelada', 'Cancelada'),
+    ]
+    
+    # CAMPOS DEL MODELO:
+    common_area = models.ForeignKey(
+        CommonArea,                     # Relación con área común
+        on_delete=models.CASCADE,
+        verbose_name="Área común"
+    )
+    
+    resident = models.ForeignKey(
+        User,                          # Relación con usuario
+        on_delete=models.CASCADE,
+        verbose_name="Residente"
+    )
+    
+    start_time = models.DateTimeField(
+        verbose_name="Fecha y hora de inicio"
+    )
+    
+    end_time = models.DateTimeField(
+        verbose_name="Fecha y hora de fin"
+    )
+    
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='Pendiente',           # Valor por defecto
+        verbose_name="Estado"
+    )
+    
+    total_paid = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Monto pagado"
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,             # Auto-generado
+        verbose_name="Fecha de creación"
+    )
+    
+    # METADATOS:
+    class Meta:
+        verbose_name = "Reserva"
+        verbose_name_plural = "Reservas"
+        ordering = ['-start_time']     # Ordenado por fecha descendente
+        
+    def __str__(self):
+        return f"{self.common_area.name} - {self.resident.get_full_name()} ({self.start_time.strftime('%d/%m/%Y %H:%M')})"
+
+================================================================================
+📝 3. SERIALIZER DEL BACKEND:
+================================================================================
+
+📂 Archivo: administration/serializers.py
+📍 Líneas: 107-121
+
+class ReservationSerializer(serializers.ModelSerializer):
+    """Serializer para el modelo Reservation"""
+    
+    # CAMPOS ADICIONALES DE SOLO LECTURA:
+    common_area_name = serializers.CharField(
+        source='common_area.name', 
+        read_only=True
+    )
+    resident_name = serializers.CharField(
+        source='resident.get_full_name', 
+        read_only=True
+    )
+    resident_email = serializers.CharField(
+        source='resident.email', 
+        read_only=True
+    )
+    
+    class Meta:
+        model = Reservation
+        fields = [
+            'id',                  # Auto-generado
+            'common_area',         # ID del área común (REQUERIDO)
+            'common_area_name',    # Nombre del área (READ-ONLY)
+            'resident',            # ID del residente (REQUERIDO)
+            'resident_name',       # Nombre del residente (READ-ONLY)
+            'resident_email',      # Email del residente (READ-ONLY)
+            'start_time',          # Fecha/hora inicio (REQUERIDO)
+            'end_time',            # Fecha/hora fin (REQUERIDO)
+            'status',              # Estado (OPCIONAL)
+            'total_paid',          # Monto pagado (REQUERIDO)
+            'created_at'           # Fecha creación (READ-ONLY)
+        ]
+        read_only_fields = ['created_at']
+
+================================================================================
+🎯 4. VIEWSET DEL BACKEND CON VALIDACIONES ESPECIALES:
+================================================================================
+
+📂 Archivo: administration/views.py
+📍 Líneas: 115-169
+
+class ReservationViewSet(viewsets.ModelViewSet):
+    """ViewSet para gestionar las reservas de áreas comunes"""
+    queryset = Reservation.objects.all()
+    serializer_class = ReservationSerializer
+    permission_classes = [IsAuthenticated]  # Requiere JWT Token
+    
+    def get_queryset(self):
+        """Optimizar consultas incluyendo área común y residente relacionados"""
+        return Reservation.objects.select_related('common_area', 'resident').order_by('-start_time')
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Crear una nueva reserva con validación de conflictos de horario
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Extraer datos validados
+        common_area = serializer.validated_data['common_area']
+        start_time = serializer.validated_data['start_time']
+        end_time = serializer.validated_data['end_time']
+        
+        # VALIDACIÓN 1: Fecha de fin posterior a inicio
+        if end_time <= start_time:
+            return Response(
+                {'error': 'La fecha de fin debe ser posterior a la fecha de inicio'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # VALIDACIÓN 2: Conflictos con reservas confirmadas
+        conflicting_reservations = Reservation.objects.filter(
+            common_area=common_area,
+            status='Confirmada',
+            # Verificar solapamiento de horarios
+            start_time__lt=end_time,
+            end_time__gt=start_time
+        )
+        
+        if conflicting_reservations.exists():
+            conflicting_reservation = conflicting_reservations.first()
+            return Response(
+                {
+                    'error': 'Conflicto de horario detectado',
+                    'details': f'El área "{common_area.name}" ya está reservada desde '
+                              f'{conflicting_reservation.start_time.strftime("%d/%m/%Y %H:%M")} '
+                              f'hasta {conflicting_reservation.end_time.strftime("%d/%m/%Y %H:%M")} '
+                              f'por {conflicting_reservation.resident.get_full_name()}'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Si no hay conflictos, crear la reserva
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data, 
+            status=status.HTTP_201_CREATED, 
+            headers=headers
+        )
+
+FUNCIONALIDADES INCLUIDAS:
+✅ CRUD Completo (Create, Read, Update, Delete)
+✅ Autenticación JWT requerida
+✅ Validación de conflictos de horario
+✅ Validación de fechas lógicas
+✅ Paginación automática (20 items por página)
+✅ Ordenamiento por fecha descendente
+✅ Optimización de consultas con select_related
+
+================================================================================
+📊 5. ESTRUCTURA DE DATOS EXACTA:
+================================================================================
+
+TIPOS DE DATOS POR CAMPO:
+
+┌─────────────────┬──────────────┬─────────────┬────────────────────────────────┐
+│ CAMPO           │ TIPO         │ REQUERIDO   │ DESCRIPCIÓN                    │
+├─────────────────┼──────────────┼─────────────┼────────────────────────────────┤
+│ id              │ INTEGER      │ AUTO        │ ID único (auto-generado)       │
+│ common_area     │ INTEGER      │ ✅ SÍ       │ ID del área común (ForeignKey) │
+│ common_area_name│ STRING       │ READ-ONLY   │ Nombre del área común          │
+│ resident        │ INTEGER      │ ✅ SÍ       │ ID del usuario (ForeignKey)    │
+│ resident_name   │ STRING       │ READ-ONLY   │ Nombre completo del residente  │
+│ resident_email  │ STRING       │ READ-ONLY   │ Email del residente            │
+│ start_time      │ DATETIME     │ ✅ SÍ       │ Fecha/hora inicio (ISO 8601)   │
+│ end_time        │ DATETIME     │ ✅ SÍ       │ Fecha/hora fin (ISO 8601)      │
+│ status          │ STRING       │ ❌ NO       │ Estado ('Pendiente' default)   │
+│ total_paid      │ DECIMAL      │ ✅ SÍ       │ Monto (10 dígitos, 2 decimales)│
+│ created_at      │ DATETIME     │ AUTO        │ Fecha creación (auto-generado) │
+└─────────────────┴──────────────┴─────────────┴────────────────────────────────┘
+
+VALIDACIONES ESPECÍFICAS:
+- common_area: Debe existir en la tabla CommonArea
+- resident: Debe existir en la tabla User
+- start_time: Formato ISO 8601 (YYYY-MM-DDTHH:MM:SSZ)
+- end_time: Formato ISO 8601, debe ser posterior a start_time
+- status: Debe ser uno de: 'Pendiente', 'Confirmada', 'Cancelada'
+- total_paid: Debe ser decimal válido (formato: XXXXX.XX)
+
+VALIDACIONES ESPECIALES DE NEGOCIO:
+1. end_time > start_time (obligatorio)
+2. No solapamiento con reservas confirmadas del mismo área
+3. Solo verifica conflictos con reservas con status='Confirmada'
+
+VALORES POR DEFECTO:
+- id: Auto-generado por la base de datos
+- status: 'Pendiente'
+- created_at: Fecha/hora actual
+
+VALORES VÁLIDOS PARA STATUS:
+- 'Pendiente' (default)
+- 'Confirmada'
+- 'Cancelada'
+
+================================================================================
+📤 6. FORMATO PARA POST (CREAR NUEVA RESERVA):
+================================================================================
+
+ENDPOINT: POST /api/administration/reservations/
+HEADERS REQUERIDOS:
+  Authorization: Bearer <jwt_token>
+  Content-Type: application/json
+
+⚠️ IMPORTANTE: Los errores 400 indican problemas con el formato de datos
+
+EJEMPLO 1 - RESERVA BÁSICA:
+{
+    "common_area": 1,
+    "resident": 2,
+    "start_time": "2025-09-15T10:00:00Z",
+    "end_time": "2025-09-15T12:00:00Z",
+    "total_paid": "150.00"
+}
+
+EJEMPLO 2 - RESERVA CON STATUS ESPECÍFICO:
+{
+    "common_area": 1,
+    "resident": 2,
+    "start_time": "2025-09-20T18:00:00Z",
+    "end_time": "2025-09-20T22:00:00Z",
+    "status": "Confirmada",
+    "total_paid": "300.00"
+}
+
+EJEMPLO 3 - DIFERENTES FORMATOS DE DATETIME:
+{
+    "common_area": 2,
+    "resident": 3,
+    "start_time": "2025-09-25T14:30:00.000Z",    // Con milisegundos
+    "end_time": "2025-09-25T17:30:00.000Z",
+    "total_paid": "120.00"
+}
+
+🚨 FORMATOS DATETIME SOPORTADOS:
+- "2025-09-15T10:00:00Z"           (ISO 8601 básico)
+- "2025-09-15T10:00:00.000Z"       (Con milisegundos)
+- "2025-09-15T10:00:00+00:00"      (Con timezone explícito)
+- "2025-09-15 10:00:00"            (Formato simple)
+
+RESPUESTA EXITOSA (201 Created):
+{
+    "id": 3,
+    "common_area": 1,
+    "common_area_name": "Salón de Eventos",
+    "resident": 2,
+    "resident_name": "Juan Pérez",
+    "resident_email": "juan.perez@email.com",
+    "start_time": "2025-09-15T10:00:00Z",
+    "end_time": "2025-09-15T12:00:00Z",
+    "status": "Pendiente",
+    "total_paid": "150.00",
+    "created_at": "2025-09-12T01:00:00Z"
+}
+
+================================================================================
+🔄 7. FORMATO PARA PUT/PATCH (ACTUALIZAR RESERVA):
+================================================================================
+
+ENDPOINT: PUT /api/administration/reservations/{id}/
+ENDPOINT: PATCH /api/administration/reservations/{id}/
+
+DIFERENCIAS:
+- PUT: Requiere TODOS los campos obligatorios
+- PATCH: Solo los campos que quieres cambiar
+
+EJEMPLO PUT (Actualización completa):
+{
+    "common_area": 1,
+    "resident": 2,
+    "start_time": "2025-09-15T09:00:00Z",
+    "end_time": "2025-09-15T13:00:00Z",
+    "status": "Confirmada",
+    "total_paid": "200.00"
+}
+
+EJEMPLO PATCH (Solo cambiar status):
+{
+    "status": "Confirmada"
+}
+
+EJEMPLO PATCH (Solo cambiar horario):
+{
+    "start_time": "2025-09-15T11:00:00Z",
+    "end_time": "2025-09-15T14:00:00Z"
+}
+
+RESPUESTA EXITOSA (200 OK):
+{
+    "id": 1,
+    "common_area": 1,
+    "common_area_name": "Salón de Eventos",
+    "resident": 2,
+    "resident_name": "Juan Pérez",
+    "resident_email": "juan.perez@email.com",
+    "start_time": "2025-09-15T11:00:00Z",
+    "end_time": "2025-09-15T14:00:00Z",
+    "status": "Confirmada",
+    "total_paid": "200.00",
+    "created_at": "2025-09-11T20:30:00Z"
+}
+
+================================================================================
+📥 8. FORMATO DE RESPUESTA GET:
+================================================================================
+
+ENDPOINT: GET /api/administration/reservations/
+
+RESPUESTA CON PAGINACIÓN:
+{
+    "count": 2,
+    "next": null,
+    "previous": null,
+    "results": [
+        {
+            "id": 1,
+            "common_area": 1,
+            "common_area_name": "Salón de Eventos",
+            "resident": 2,
+            "resident_name": "Juan Pérez",
+            "resident_email": "juan.perez@email.com",
+            "start_time": "2025-09-18T18:00:00Z",
+            "end_time": "2025-09-18T23:00:00Z",
+            "status": "Confirmada",
+            "total_paid": "300.00",
+            "created_at": "2025-09-11T20:30:00Z"
+        },
+        {
+            "id": 2,
+            "common_area": 2,
+            "common_area_name": "Piscina",
+            "resident": 3,
+            "resident_name": "Ana García",
+            "resident_email": "ana.garcia@email.com",
+            "start_time": "2025-09-14T10:00:00Z",
+            "end_time": "2025-09-14T14:00:00Z",
+            "status": "Pendiente",
+            "total_paid": "150.00",
+            "created_at": "2025-09-11T20:31:00Z"
+        }
+    ]
+}
+
+ENDPOINT: GET /api/administration/reservations/{id}/
+
+RESPUESTA RESERVA INDIVIDUAL:
+{
+    "id": 1,
+    "common_area": 1,
+    "common_area_name": "Salón de Eventos",
+    "resident": 2,
+    "resident_name": "Juan Pérez",
+    "resident_email": "juan.perez@email.com",
+    "start_time": "2025-09-18T18:00:00Z",
+    "end_time": "2025-09-18T23:00:00Z",
+    "status": "Confirmada",
+    "total_paid": "300.00",
+    "created_at": "2025-09-11T20:30:00Z"
+}
+
+================================================================================
+⚠️ 9. ANÁLISIS DE ERRORES 400 OBSERVADOS:
+================================================================================
+
+🚨 LOGS DE ERROR DEL SERVIDOR:
+[12/Sep/2025 00:55:19] "POST /api/administration/reservations/ HTTP/1.1" 400 40
+[12/Sep/2025 00:55:34] "POST /api/administration/reservations/ HTTP/1.1" 400 40
+[12/Sep/2025 00:59:44] "POST /api/administration/reservations/ HTTP/1.1" 400 82
+
+POSIBLES CAUSAS DE ERROR 400:
+
+❌ PROBLEMA 1: IDs inválidos
+   CAUSA: common_area o resident con ID que no existe
+   VERIFICAR: 
+   - CommonArea IDs válidos: 1, 2, 3, 4, 5, 10
+   - User IDs válidos: 1, 2, 3, 4
+   
+❌ PROBLEMA 2: Formato de datetime incorrecto
+   CAUSA: start_time o end_time en formato no válido
+   FORMATOS CORRECTOS:
+   ✅ "2025-09-15T10:00:00Z"
+   ✅ "2025-09-15T10:00:00.000Z"
+   ✅ "2025-09-15T10:00:00+00:00"
+   ❌ "2025-09-15 10:00" (incorrecto)
+   ❌ "15/09/2025 10:00" (incorrecto)
+
+❌ PROBLEMA 3: Validación de fechas
+   CAUSA: end_time <= start_time
+   SOLUCIÓN: Asegurar que end_time sea posterior a start_time
+
+❌ PROBLEMA 4: Formato de decimal incorrecto
+   CAUSA: total_paid en formato no válido
+   FORMATOS CORRECTOS:
+   ✅ "150.00"
+   ✅ "150.50" 
+   ✅ "1500.00"
+   ❌ 150 (sin comillas)
+   ❌ "150" (sin decimales)
+
+❌ PROBLEMA 5: Status inválido
+   CAUSA: status con valor no permitido
+   VALORES VÁLIDOS:
+   ✅ "Pendiente"
+   ✅ "Confirmada"
+   ✅ "Cancelada"
+   ❌ "Pending" (incorrecto)
+   ❌ "Confirmed" (incorrecto)
+
+❌ PROBLEMA 6: Campos faltantes
+   CAMPOS OBLIGATORIOS PARA POST:
+   ✅ common_area (integer)
+   ✅ resident (integer)
+   ✅ start_time (datetime string)
+   ✅ end_time (datetime string)
+   ✅ total_paid (decimal string)
+
+❌ PROBLEMA 7: Headers incorrectos
+   HEADERS REQUERIDOS:
+   ✅ Authorization: Bearer <valid_jwt_token>
+   ✅ Content-Type: application/json
+
+================================================================================
+🔧 10. DATOS DE REFERENCIA PARA TESTING:
+================================================================================
+
+IDS VÁLIDOS PARA TESTING:
+
+📍 COMMON AREAS DISPONIBLES:
+- ID: 1, Name: "Salón de Eventos", Price: $300.00
+- ID: 2, Name: "Piscina", Price: $150.00
+- ID: 3, Name: "Cancha de Tenis", Price: $100.00
+- ID: 4, Name: "Gimnasio", Price: $50.00
+- ID: 5, Name: "Terraza BBQ", Price: $120.00
+- ID: 10, Name: "Sala de Reuniones", Price: $75.00
+
+👥 USUARIOS DISPONIBLES:
+- ID: 1, Name: "María Administradora", Email: "admin@smartcondo.com"
+- ID: 2, Name: "Juan Pérez", Email: "juan.perez@email.com"
+- ID: 3, Name: "Ana García", Email: "ana.garcia@email.com"
+- ID: 4, Name: "Carlos Seguridad", Email: "carlos.seguridad@email.com"
+
+📅 RESERVAS EXISTENTES (para evitar conflictos):
+- Reserva 1: Salón de Eventos, Juan Pérez, 18/09/2025 18:00-23:00, Confirmada
+- Reserva 2: Piscina, Ana García, 14/09/2025 10:00-14:00, Pendiente
+
+================================================================================
+🧪 11. EJEMPLOS DE TESTING CON CURL:
+================================================================================
+
+# 1. OBTENER TOKEN DE AUTENTICACIÓN:
+curl -X POST http://localhost:8000/api/token/ \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan.perez@email.com","password":"password123"}'
+
+# 2. LISTAR TODAS LAS RESERVAS:
+curl -X GET http://localhost:8000/api/administration/reservations/ \
+  -H "Authorization: Bearer <tu_token_aqui>"
+
+# 3. CREAR NUEVA RESERVA (FORMATO CORRECTO):
+curl -X POST http://localhost:8000/api/administration/reservations/ \
+  -H "Authorization: Bearer <tu_token_aqui>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "common_area": 3,
+    "resident": 2,
+    "start_time": "2025-09-25T16:00:00Z",
+    "end_time": "2025-09-25T18:00:00Z",
+    "total_paid": "100.00"
+  }'
+
+# 4. CREAR RESERVA CON STATUS ESPECÍFICO:
+curl -X POST http://localhost:8000/api/administration/reservations/ \
+  -H "Authorization: Bearer <tu_token_aqui>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "common_area": 4,
+    "resident": 3,
+    "start_time": "2025-09-30T07:00:00Z",
+    "end_time": "2025-09-30T09:00:00Z",
+    "status": "Confirmada",
+    "total_paid": "50.00"
+  }'
+
+# 5. ACTUALIZAR STATUS DE RESERVA:
+curl -X PATCH http://localhost:8000/api/administration/reservations/1/ \
+  -H "Authorization: Bearer <tu_token_aqui>" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "Confirmada"}'
+
+# 6. ACTUALIZAR HORARIO DE RESERVA:
+curl -X PATCH http://localhost:8000/api/administration/reservations/2/ \
+  -H "Authorization: Bearer <tu_token_aqui>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "start_time": "2025-09-14T11:00:00Z",
+    "end_time": "2025-09-14T15:00:00Z"
+  }'
+
+# 7. ELIMINAR RESERVA:
+curl -X DELETE http://localhost:8000/api/administration/reservations/2/ \
+  -H "Authorization: Bearer <tu_token_aqui>"
+
+================================================================================
+🚨 12. RESOLUCIÓN DE PROBLEMAS ESPECÍFICOS:
+================================================================================
+
+🔍 DEBUGGING DEL ERROR 400:
+
+1. **VERIFICAR FORMATO JSON**:
+   ✅ Usar comillas dobles para strings
+   ✅ No trailing commas
+   ✅ Estructura válida
+
+2. **VERIFICAR IDS EXISTEN**:
+   ✅ common_area: debe existir en CommonArea
+   ✅ resident: debe existir en User
+
+3. **VERIFICAR FORMATO DATETIME**:
+   ✅ Usar formato ISO 8601
+   ✅ Incluir timezone (Z o +00:00)
+   ✅ end_time > start_time
+
+4. **VERIFICAR DECIMAL**:
+   ✅ total_paid como string: "150.00"
+   ✅ Máximo 10 dígitos, 2 decimales
+
+5. **VERIFICAR STATUS**:
+   ✅ Solo: "Pendiente", "Confirmada", "Cancelada"
+   ✅ Respetar mayúsculas/minúsculas
+
+EJEMPLO DE REQUEST PROBLEMÁTICO (Error 400):
+{
+    "common_area": 999,                    // ❌ ID no existe
+    "resident": 1,
+    "start_time": "2025-09-15 10:00",      // ❌ Formato incorrecto
+    "end_time": "2025-09-15T09:00:00Z",    // ❌ Anterior a start_time
+    "status": "Pending",                   // ❌ Status inválido
+    "total_paid": 150                      // ❌ No es string
+}
+
+EJEMPLO DE REQUEST CORRECTO (Success 201):
+{
+    "common_area": 1,                      // ✅ ID válido
+    "resident": 2,                         // ✅ ID válido
+    "start_time": "2025-09-15T10:00:00Z",  // ✅ Formato correcto
+    "end_time": "2025-09-15T12:00:00Z",    // ✅ Posterior a start
+    "status": "Pendiente",                 // ✅ Status válido
+    "total_paid": "150.00"                 // ✅ String decimal
+}
+
+================================================================================
+💡 13. RECOMENDACIONES PARA EL FRONTEND:
+================================================================================
+
+1. ✅ **VALIDACIÓN PREVIA**:
+   - Verificar que los IDs existen antes de enviar
+   - Validar formato de fechas en el frontend
+   - Asegurar que end_time > start_time
+   - Formatear total_paid como string decimal
+
+2. ✅ **MANEJO DE ERRORES**:
+   - Capturar errores 400 específicos
+   - Mostrar mensajes de validación claros
+   - Manejar conflictos de horario
+   - Validar disponibilidad antes de enviar
+
+3. ✅ **UX MEJORADA**:
+   - Calendario visual para selección de fechas
+   - Verificación de disponibilidad en tiempo real
+   - Confirmación antes de reservar
+   - Estados visuales claros
+
+4. ✅ **OPTIMIZACIONES**:
+   - Cache de áreas comunes y usuarios
+   - Validación de conflictos local
+   - Auto-cálculo de total_paid basado en área
+   - Sugerencias de horarios disponibles
+
+================================================================================
+🏁 RESUMEN EJECUTIVO:
+================================================================================
+
+❌ ESTADO GENERAL: PARCIALMENTE FUNCIONAL
+✅ GET/PATCH/PUT/DELETE: OPERATIVOS
+❌ POST: ERROR 400 (requiere debugging de formato)
+✅ AUTENTICACIÓN: JWT IMPLEMENTADA Y FUNCIONANDO
+✅ VALIDACIONES ESPECIALES: CONFLICTOS DE HORARIO
+✅ PAGINACIÓN: ACTIVADA Y FUNCIONANDO
+
+PRÓXIMOS PASOS PARA RESOLVER POST:
+1. Verificar formato exacto de datos enviados
+2. Confirmar IDs válidos en common_area y resident
+3. Validar formato ISO 8601 en datetime fields
+4. Asegurar total_paid como string decimal
+5. Verificar headers y autenticación
+
+================================================================================
+📞 SOPORTE TÉCNICO:
+================================================================================
+
+Para resolver el error 400 en POST:
+1. Activar logs detallados en Django settings
+2. Agregar print statements en el ViewSet
+3. Verificar datos exactos enviados vs esperados
+4. Probar con datos mínimos válidos
+5. Usar herramientas como Postman para debugging
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================
