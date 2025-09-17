@@ -1,0 +1,487 @@
+SMART CONDOMINIUM - BACKEND API DOCUMENTATION
+============================================
+FASE 4: GESTIÓN DE VEHÍCULOS, MASCOTAS Y VISITANTES
+==================================================
+
+📋 ÍNDICE
+---------
+1. Endpoints de Vehículos
+2. Endpoints de Mascotas  
+3. Endpoints de Visitantes
+4. Autenticación y Permisos
+5. Códigos de Error
+6. Ejemplos de Uso
+7. Integración Frontend
+
+🚗 1. ENDPOINTS DE VEHÍCULOS
+============================
+
+Base URL: /api/administration/vehicles/
+
+1.1 LISTAR VEHÍCULOS
+--------------------
+GET /api/administration/vehicles/
+
+Filtrado automático por usuario:
+- Residentes: Solo ven sus propios vehículos
+- Administradores/Guardias: Ven todos los vehículos
+
+Response:
+```json
+[
+    {
+        "id": 1,
+        "resident": 2,
+        "resident_name": "Juan Pérez",
+        "resident_email": "juan.perez@email.com",
+        "unit_number": "A-101",
+        "license_plate": "ABC-123",
+        "brand": "Toyota",
+        "model": "Corolla",
+        "color": "Blanco",
+        "created_at": "2025-09-12T10:30:00Z"
+    }
+]
+```
+
+1.2 CREAR VEHÍCULO
+------------------
+POST /api/administration/vehicles/
+
+Body:
+```json
+{
+    "license_plate": "XYZ-789",
+    "brand": "Honda",
+    "model": "Accord",
+    "color": "Negro"
+}
+```
+
+Notas:
+- El resident se asigna automáticamente al usuario autenticado
+- license_plate debe ser único
+- Se convierte automáticamente a mayúsculas
+
+1.3 ACTUALIZAR VEHÍCULO
+-----------------------
+PUT/PATCH /api/administration/vehicles/{id}/
+
+Body:
+```json
+{
+    "color": "Azul Metalizado",
+    "brand": "Honda"
+}
+```
+
+1.4 ELIMINAR VEHÍCULO
+---------------------
+DELETE /api/administration/vehicles/{id}/
+
+🐕 2. ENDPOINTS DE MASCOTAS
+===========================
+
+Base URL: /api/administration/pets/
+
+2.1 LISTAR MASCOTAS
+-------------------
+GET /api/administration/pets/
+
+Filtrado automático por usuario:
+- Residentes: Solo ven sus propias mascotas
+- Administradores/Guardias: Ven todas las mascotas
+
+Response:
+```json
+[
+    {
+        "id": 1,
+        "resident": 2,
+        "resident_name": "Juan Pérez",
+        "resident_email": "juan.perez@email.com",
+        "unit_number": "A-101",
+        "name": "Buddy",
+        "species": "Perro",
+        "breed": "Labrador",
+        "age": 3,
+        "created_at": "2025-09-12T10:35:00Z"
+    }
+]
+```
+
+2.2 CREAR MASCOTA
+-----------------
+POST /api/administration/pets/
+
+Body:
+```json
+{
+    "name": "Luna",
+    "species": "Gato",
+    "breed": "Persa",
+    "age": 2
+}
+```
+
+Opciones de species:
+- "Perro"
+- "Gato" 
+- "Ave"
+- "Pez"
+- "Otro"
+
+2.3 ACTUALIZAR MASCOTA
+----------------------
+PUT/PATCH /api/administration/pets/{id}/
+
+Body:
+```json
+{
+    "age": 4,
+    "breed": "Labrador Golden"
+}
+```
+
+2.4 ELIMINAR MASCOTA
+--------------------
+DELETE /api/administration/pets/{id}/
+
+👥 3. ENDPOINTS DE VISITANTES
+=============================
+
+Base URL: /api/administration/visitor-logs/
+
+3.1 LISTAR REGISTROS DE VISITANTES
+----------------------------------
+GET /api/administration/visitor-logs/
+
+Filtrado automático por usuario:
+- Residentes: Solo ven visitantes que los han visitado
+- Administradores/Guardias: Ven todos los registros
+
+Response:
+```json
+[
+    {
+        "id": 1,
+        "visitor_name": "María Rodríguez",
+        "visitor_dni": "12345678",
+        "resident": 2,
+        "resident_name": "Juan Pérez",
+        "resident_email": "juan.perez@email.com",
+        "unit_number": "A-101",
+        "entry_time": "2025-09-12T08:30:00Z",
+        "exit_time": null,
+        "vehicle_license_plate": "VIS-001",
+        "status": "Activo",
+        "observations": "Visita familiar",
+        "duration_minutes": null
+    }
+]
+```
+
+3.2 REGISTRAR ENTRADA DE VISITANTE
+----------------------------------
+POST /api/administration/visitor-logs/
+
+Body:
+```json
+{
+    "visitor_name": "Carlos Mendoza",
+    "visitor_dni": "87654321",
+    "resident": 3,
+    "vehicle_license_plate": "VIS-002",
+    "observations": "Técnico de mantenimiento"
+}
+```
+
+Notas:
+- entry_time se asigna automáticamente
+- status se establece como "Activo"
+- exit_time es null al crear el registro
+
+3.3 REGISTRAR SALIDA DE VISITANTE
+---------------------------------
+POST /api/administration/visitor-logs/{id}/register_exit/
+
+Response:
+```json
+{
+    "message": "Salida registrada exitosamente",
+    "data": {
+        "id": 1,
+        "visitor_name": "María Rodríguez",
+        "exit_time": "2025-09-12T12:30:00Z",
+        "status": "Salió",
+        "duration_minutes": 240
+    }
+}
+```
+
+3.4 VISITANTES ACTIVOS
+----------------------
+GET /api/administration/visitor-logs/active_visitors/
+
+Retorna solo visitantes que están actualmente en el condominio (sin exit_time).
+
+3.5 REPORTE DIARIO
+------------------
+GET /api/administration/visitor-logs/daily_report/
+
+Response:
+```json
+{
+    "date": "12/09/2025",
+    "statistics": {
+        "total_visitors": 8,
+        "active_visitors": 3,
+        "visitors_left": 5
+    },
+    "visitors": [...]
+}
+```
+
+🔐 4. AUTENTICACIÓN Y PERMISOS
+=============================
+
+4.1 HEADERS REQUERIDOS
+----------------------
+```
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+```
+
+4.2 FILTRADO POR ROLES
+----------------------
+
+RESIDENTES:
+- Vehículos: Solo sus propios vehículos
+- Mascotas: Solo sus propias mascotas
+- Visitantes: Solo visitantes que los han visitado
+
+ADMINISTRADORES/GUARDIAS:
+- Acceso completo a todos los registros
+- Pueden gestionar vehículos/mascotas de cualquier residente
+- Acceso completo a registros de visitantes
+
+4.3 PERMISOS ESPECIALES
+-----------------------
+- register_exit: Solo admin/guardia pueden registrar salidas
+- daily_report: Solo admin/guardia tienen acceso
+- active_visitors: Solo admin/guardia tienen acceso
+
+⚠️ 5. CÓDIGOS DE ERROR
+======================
+
+400 - Bad Request:
+```json
+{
+    "license_plate": ["La placa debe tener al menos 6 caracteres."]
+}
+```
+
+400 - Validación de edad:
+```json
+{
+    "age": ["La edad debe estar entre 0 y 30 años."]
+}
+```
+
+400 - DNI inválido:
+```json
+{
+    "visitor_dni": ["El DNI debe tener al menos 7 caracteres."]
+}
+```
+
+400 - Visitante ya salió:
+```json
+{
+    "error": "Este visitante ya registró su salida"
+}
+```
+
+403 - Forbidden:
+```json
+{
+    "detail": "No tiene permisos para realizar esta acción."
+}
+```
+
+409 - Conflict (placa duplicada):
+```json
+{
+    "license_plate": ["vehicle con este placa del vehículo ya existe."]
+}
+```
+
+📝 6. EJEMPLOS DE USO
+====================
+
+6.1 FLUJO COMPLETO DE VEHÍCULO
+------------------------------
+
+1. Autenticarse:
+```bash
+curl -X POST http://localhost:8000/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"email": "juan.perez@email.com", "password": "password123"}'
+```
+
+2. Registrar vehículo:
+```bash
+curl -X POST http://localhost:8000/api/administration/vehicles/ \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "license_plate": "NEW-456",
+    "brand": "BMW",
+    "model": "X3",
+    "color": "Negro"
+  }'
+```
+
+3. Listar mis vehículos:
+```bash
+curl -X GET http://localhost:8000/api/administration/vehicles/ \
+  -H "Authorization: Bearer <token>"
+```
+
+6.2 FLUJO COMPLETO DE VISITANTE
+-------------------------------
+
+1. Registrar entrada:
+```bash
+curl -X POST http://localhost:8000/api/administration/visitor-logs/ \
+  -H "Authorization: Bearer <guardia_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "visitor_name": "Roberto Silva",
+    "visitor_dni": "98765432",
+    "resident": 2,
+    "vehicle_license_plate": "VIS-003",
+    "observations": "Delivery"
+  }'
+```
+
+2. Ver visitantes activos:
+```bash
+curl -X GET http://localhost:8000/api/administration/visitor-logs/active_visitors/ \
+  -H "Authorization: Bearer <guardia_token>"
+```
+
+3. Registrar salida:
+```bash
+curl -X POST http://localhost:8000/api/administration/visitor-logs/1/register_exit/ \
+  -H "Authorization: Bearer <guardia_token>"
+```
+
+🌐 7. INTEGRACIÓN FRONTEND
+==========================
+
+7.1 COMPONENTES SUGERIDOS
+-------------------------
+- VehicleList: Lista de vehículos del residente
+- VehicleForm: Formulario para agregar/editar vehículos
+- PetList: Lista de mascotas del residente
+- PetForm: Formulario para agregar/editar mascotas
+- VisitorRegistry: Panel para guardias/admin
+- VisitorDashboard: Dashboard con estadísticas diarias
+- ActiveVisitors: Lista en tiempo real de visitantes
+
+7.2 ESTADOS DE LA APLICACIÓN
+----------------------------
+```javascript
+// Estado para vehículos
+const vehicleState = {
+  vehicles: [],
+  loading: false,
+  error: null
+};
+
+// Estado para mascotas
+const petState = {
+  pets: [],
+  loading: false,
+  error: null
+};
+
+// Estado para visitantes
+const visitorState = {
+  visitors: [],
+  activeVisitors: [],
+  dailyStats: null,
+  loading: false,
+  error: null
+};
+```
+
+7.3 SERVICIOS API SUGERIDOS
+---------------------------
+```javascript
+// vehicleService.js
+export const vehicleAPI = {
+  getMyVehicles: () => api.get('/vehicles/'),
+  createVehicle: (data) => api.post('/vehicles/', data),
+  updateVehicle: (id, data) => api.patch(`/vehicles/${id}/`, data),
+  deleteVehicle: (id) => api.delete(`/vehicles/${id}/`)
+};
+
+// petService.js
+export const petAPI = {
+  getMyPets: () => api.get('/pets/'),
+  createPet: (data) => api.post('/pets/', data),
+  updatePet: (id, data) => api.patch(`/pets/${id}/`, data),
+  deletePet: (id) => api.delete(`/pets/${id}/`)
+};
+
+// visitorService.js
+export const visitorAPI = {
+  getAllVisitors: () => api.get('/visitor-logs/'),
+  registerEntry: (data) => api.post('/visitor-logs/', data),
+  registerExit: (id) => api.post(`/visitor-logs/${id}/register_exit/`),
+  getActiveVisitors: () => api.get('/visitor-logs/active_visitors/'),
+  getDailyReport: () => api.get('/visitor-logs/daily_report/')
+};
+```
+
+🎯 RESUMEN ENDPOINTS FASE 4
+===========================
+
+VEHÍCULOS:
+✅ GET    /api/administration/vehicles/          - Listar vehículos
+✅ POST   /api/administration/vehicles/          - Crear vehículo
+✅ GET    /api/administration/vehicles/{id}/     - Detalle vehículo
+✅ PUT    /api/administration/vehicles/{id}/     - Actualizar vehículo
+✅ DELETE /api/administration/vehicles/{id}/     - Eliminar vehículo
+
+MASCOTAS:
+✅ GET    /api/administration/pets/              - Listar mascotas
+✅ POST   /api/administration/pets/              - Crear mascota
+✅ GET    /api/administration/pets/{id}/         - Detalle mascota
+✅ PUT    /api/administration/pets/{id}/         - Actualizar mascota
+✅ DELETE /api/administration/pets/{id}/         - Eliminar mascota
+
+VISITANTES:
+✅ GET    /api/administration/visitor-logs/                    - Listar registros
+✅ POST   /api/administration/visitor-logs/                    - Registrar entrada
+✅ GET    /api/administration/visitor-logs/{id}/               - Detalle registro
+✅ PUT    /api/administration/visitor-logs/{id}/               - Actualizar registro
+✅ DELETE /api/administration/visitor-logs/{id}/               - Eliminar registro
+✅ POST   /api/administration/visitor-logs/{id}/register_exit/ - Registrar salida
+✅ GET    /api/administration/visitor-logs/active_visitors/    - Visitantes activos
+✅ GET    /api/administration/visitor-logs/daily_report/       - Reporte diario
+
+📊 ESTADÍSTICAS DE LA FASE 4
+============================
+- 3 nuevos modelos implementados
+- 15 endpoints CRUD funcionales
+- 3 endpoints especiales para visitantes
+- Filtrado automático por roles
+- Validaciones robustas
+- Datos de prueba completos
+- Documentación técnica detallada
+
+🎉 ¡FASE 4 LISTA PARA PRODUCCIÓN!
+=================================

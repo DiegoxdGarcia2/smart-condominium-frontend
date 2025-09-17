@@ -38,6 +38,11 @@ export const navData = [
     icon: icon('ic-blog'),
   },
   {
+    title: 'Registro de Visitas',
+    path: '/visitor-log',
+    icon: icon('ic-book'),
+  },
+  {
     title: 'Usuarios',
     path: '/users',
     icon: icon('ic-user'),
@@ -46,5 +51,10 @@ export const navData = [
     title: 'Unidades',
     path: '/units',
     icon: icon('ic-analytics'),
+  },
+  {
+    title: 'Mi Cuenta',
+    path: '/account',
+    icon: icon('ic-user'),
   },
 ];

@@ -21,6 +21,8 @@ export const AnnouncementsPage = lazy(() => import('src/pages/announcements'));
 export const CommonAreasPage = lazy(() => import('src/pages/common-areas'));
 export const FinancesPage = lazy(() => import('src/pages/finances'));
 export const ReservationsPage = lazy(() => import('src/pages/reservations'));
+export const VisitorLogPage = lazy(() => import('src/pages/visitor-log'));
+export const AccountPage = lazy(() => import('src/pages/account'));
 export const SignInPage = lazy(() => import('src/pages/sign-in'));
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
 
@@ -62,6 +64,8 @@ export const routesSection: RouteObject[] = [
           { path: 'common-areas', element: <CommonAreasPage /> },
           { path: 'finances', element: <FinancesPage /> },
           { path: 'reservations', element: <ReservationsPage /> },
+          { path: 'visitor-log', element: <VisitorLogPage /> },
+          { path: 'account', element: <AccountPage /> },
         ],
       },
     ],
