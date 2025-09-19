@@ -1,0 +1,416 @@
+===============================================================================
+                    SMART CONDOMINIUM BACKEND - FASE 5
+                   DOCUMENTACIÓN TÉCNICA COMPLETA
+===============================================================================
+
+NUEVAS FUNCIONALIDADES IMPLEMENTADAS:
+✅ Sistema de Gestión de Tareas
+✅ Sistema de Feedback de Residentes  
+✅ Gateway de Pagos y Transacciones
+
+===============================================================================
+                           🔧 GESTIÓN DE TAREAS
+===============================================================================
+
+MODELO: Task
+- ID: Identificador único
+- title: Título de la tarea (max 200 caracteres)
+- description: Descripción detallada de la tarea
+- status: Estado ['Pendiente', 'En Progreso', 'Completada', 'Cancelada']
+- assigned_to: Usuario asignado (ForeignKey)
+- created_by: Usuario que creó la tarea (ForeignKey)
+- created_at: Fecha de creación (auto)
+- completed_at: Fecha de completado (auto cuando status = 'Completada')
+
+ENDPOINTS DISPONIBLES:
+
+1. LISTAR TAREAS
+   GET /api/administration/tasks/
+   Headers: Authorization: Bearer {jwt_token}
+   
+   Respuesta:
+   [
+     {
+       "id": 1,
+       "title": "Revisión mensual de aires acondicionados",
+       "description": "Realizar mantenimiento preventivo...",
+       "status": "Pendiente",
+       "assigned_to": 4,
+       "assigned_to_name": "Carlos Seguridad",
+       "created_by": 1,
+       "created_by_name": "María Administradora",
+       "created_at": "2025-09-16T10:30:00Z",
+       "completed_at": null
+     }
+   ]
+
+2. CREAR NUEVA TAREA
+   POST /api/administration/tasks/
+   Headers: 
+     Authorization: Bearer {jwt_token}
+     Content-Type: application/json
+   
+   Body:
+   {
+     "title": "Reparar tubería del lobby",
+     "description": "Se detectó una fuga menor en la tubería principal",
+     "assigned_to": 4,
+     "status": "Pendiente"
+   }
+
+3. MIS TAREAS ASIGNADAS
+   GET /api/administration/tasks/my_tasks/
+   Headers: Authorization: Bearer {jwt_token}
+   
+   Respuesta:
+   {
+     "statistics": {
+       "pending": 2,
+       "in_progress": 1,
+       "completed": 5,
+       "total": 8
+     },
+     "tasks": [...]
+   }
+
+4. ACTUALIZAR ESTADO DE TAREA
+   PATCH /api/administration/tasks/{id}/update_status/
+   Headers: 
+     Authorization: Bearer {jwt_token}
+     Content-Type: application/json
+   
+   Body:
+   {
+     "status": "En Progreso"
+   }
+
+PERMISOS:
+- Administradores: Ven todas las tareas, pueden crear y asignar
+- Usuarios normales: Solo ven tareas asignadas a ellos o creadas por ellos
+
+===============================================================================
+                          💬 SISTEMA DE FEEDBACK
+===============================================================================
+
+MODELO: Feedback
+- ID: Identificador único
+- subject: Asunto del feedback (max 200 caracteres)
+- message: Mensaje detallado
+- resident: Usuario que envía el feedback (ForeignKey)
+- status: Estado ['Pendiente', 'En Revisión', 'Respondido', 'Cerrado']
+- created_at: Fecha de creación (auto)
+- updated_at: Última actualización (auto)
+
+ENDPOINTS DISPONIBLES:
+
+1. LISTAR FEEDBACK
+   GET /api/administration/feedback/
+   Headers: Authorization: Bearer {jwt_token}
+   
+   Respuesta:
+   [
+     {
+       "id": 1,
+       "subject": "Problema con el ascensor",
+       "message": "El ascensor principal ha estado haciendo ruidos...",
+       "resident": 2,
+       "resident_name": "Juan Pérez",
+       "status": "Pendiente",
+       "created_at": "2025-09-16T09:15:00Z",
+       "updated_at": "2025-09-16T09:15:00Z"
+     }
+   ]
+
+2. CREAR NUEVO FEEDBACK
+   POST /api/administration/feedback/
+   Headers: 
+     Authorization: Bearer {jwt_token}
+     Content-Type: application/json
+   
+   Body:
+   {
+     "subject": "Sugerencia para el gimnasio",
+     "message": "Me gustaría sugerir la instalación de más equipos..."
+   }
+
+3. MI FEEDBACK
+   GET /api/administration/feedback/my_feedback/
+   Headers: Authorization: Bearer {jwt_token}
+   
+   Respuesta:
+   {
+     "statistics": {
+       "pending": 1,
+       "in_review": 2,
+       "responded": 1,
+       "closed": 0,
+       "total": 4
+     },
+     "feedbacks": [...]
+   }
+
+4. DASHBOARD ADMINISTRATIVO (Solo Admins)
+   GET /api/administration/feedback/admin_dashboard/
+   Headers: Authorization: Bearer {jwt_token}
+   
+   Respuesta:
+   {
+     "statistics": {
+       "pending": 5,
+       "in_review": 3,
+       "responded": 2,
+       "closed": 1,
+       "total": 11
+     },
+     "recent_pending": [...]
+   }
+
+PERMISOS:
+- Administradores: Ven todos los feedbacks y tienen acceso al dashboard
+- Usuarios normales: Solo ven sus propios feedbacks
+
+===============================================================================
+                        💳 GATEWAY DE PAGOS
+===============================================================================
+
+MODELO: PaymentTransaction
+- ID: Identificador único
+- financial_fee: Cuota financiera asociada (ForeignKey)
+- resident: Usuario que realiza el pago (ForeignKey)
+- transaction_id: ID único de transacción (auto-generado)
+- amount: Monto del pago
+- status: Estado ['Pendiente', 'Procesando', 'Completado', 'Fallido', 'Cancelado']
+- payment_method: Método de pago utilizado
+- gateway_response: Respuesta del gateway (JSONField)
+- created_at: Fecha de creación (auto)
+- processed_at: Fecha de procesamiento (auto)
+
+ENDPOINTS DISPONIBLES:
+
+1. LISTAR TRANSACCIONES
+   GET /api/administration/payments/
+   Headers: Authorization: Bearer {jwt_token}
+   
+   Respuesta:
+   [
+     {
+       "id": 1,
+       "financial_fee": 1,
+       "fee_description": "Cuota de mantenimiento - Septiembre 2025",
+       "fee_amount": "250.00",
+       "resident": 2,
+       "resident_name": "Juan Pérez",
+       "transaction_id": "TXN_755BB7A978C5",
+       "amount": "250.00",
+       "status": "Completado",
+       "payment_method": "Tarjeta de Crédito",
+       "gateway_response": {"payment_id": "pay_12345", "status": "approved"},
+       "created_at": "2025-09-11T14:20:00Z",
+       "processed_at": "2025-09-11T14:22:00Z"
+     }
+   ]
+
+2. INICIAR PROCESO DE PAGO
+   POST /api/administration/payments/initiate_payment/
+   Headers: 
+     Authorization: Bearer {jwt_token}
+     Content-Type: application/json
+   
+   Body:
+   {
+     "financial_fee_id": 1
+   }
+   
+   Respuesta:
+   {
+     "message": "Transacción iniciada exitosamente",
+     "transaction": {
+       "id": 5,
+       "transaction_id": "TXN_ABC123DEF456",
+       "amount": "250.00",
+       "status": "Pendiente",
+       ...
+     }
+   }
+
+3. MIS PAGOS
+   GET /api/administration/payments/my_payments/
+   Headers: Authorization: Bearer {jwt_token}
+   
+   Respuesta:
+   {
+     "statistics": {
+       "pending": 1,
+       "processing": 0,
+       "completed": 3,
+       "failed": 0,
+       "total": 4
+     },
+     "transactions": [...]
+   }
+
+4. WEBHOOK PARA GATEWAY (Para servicios externos)
+   POST /api/administration/payments/payment_webhook/
+   Headers: Content-Type: application/json
+   
+   Body:
+   {
+     "transaction_id": "TXN_ABC123DEF456",
+     "status": "Completado",
+     "gateway_response": {
+       "payment_id": "pay_67890",
+       "status": "approved",
+       "amount": 250.00
+     }
+   }
+
+PERMISOS:
+- Administradores: Ven todas las transacciones
+- Usuarios normales: Solo ven sus propias transacciones
+
+===============================================================================
+                            🔒 AUTENTICACIÓN
+===============================================================================
+
+TODOS los endpoints requieren autenticación JWT.
+
+1. OBTENER TOKEN:
+   POST /api/token/
+   Body: {"email": "usuario@email.com", "password": "password123"}
+   
+2. USAR TOKEN:
+   Headers: Authorization: Bearer {jwt_token}
+
+3. REFRESCAR TOKEN:
+   POST /api/token/refresh/
+   Body: {"refresh": "refresh_token"}
+
+===============================================================================
+                            📊 CÓDIGOS DE ESTADO
+===============================================================================
+
+200 OK - Solicitud exitosa
+201 CREATED - Recurso creado exitosamente
+400 BAD REQUEST - Error en los datos enviados
+401 UNAUTHORIZED - Token JWT inválido o ausente
+403 FORBIDDEN - Sin permisos para acceder al recurso
+404 NOT FOUND - Recurso no encontrado
+500 INTERNAL SERVER ERROR - Error del servidor
+
+===============================================================================
+                            🧪 DATOS DE PRUEBA
+===============================================================================
+
+USUARIOS DISPONIBLES:
+- admin@smartcondo.com / password123 (Administrador)
+- juan.perez@email.com / password123 (Residente)
+- ana.garcia@email.com / password123 (Residente)
+- carlos.seguridad@email.com / password123 (Guardia)
+
+TAREAS DE EJEMPLO:
+- "Revisión mensual de aires acondicionados" (Pendiente)
+- "Reparación de puerta del gimnasio" (En Progreso)
+- "Instalación de nueva cámara en lobby" (Completada)
+- "Limpieza de filtros de la piscina" (Pendiente)
+
+FEEDBACK DE EJEMPLO:
+- "Problema con el ascensor" (Pendiente)
+- "Sugerencia para mejora del gimnasio" (En Revisión)
+- "Ruido en el piso superior" (Respondido)
+- "Agradecimiento por la limpieza" (Cerrado)
+
+TRANSACCIONES DE EJEMPLO:
+- TXN_755BB7A978C5 (Completado)
+- TXN_DE80B2C95E89 (Pendiente)
+- TXN_8BE9CD383940 (Fallido)
+- TXN_3CB7762D711E (Procesando)
+
+===============================================================================
+                            🚀 EJEMPLOS DE USO
+===============================================================================
+
+1. CREAR UNA TAREA (Como Administrador):
+   curl -X POST http://localhost:8000/api/administration/tasks/ \
+   -H "Authorization: Bearer {jwt_token}" \
+   -H "Content-Type: application/json" \
+   -d '{
+     "title": "Mantenimiento de jardines",
+     "description": "Podar arbustos y regar plantas del área común",
+     "assigned_to": 4,
+     "status": "Pendiente"
+   }'
+
+2. ENVIAR FEEDBACK (Como Residente):
+   curl -X POST http://localhost:8000/api/administration/feedback/ \
+   -H "Authorization: Bearer {jwt_token}" \
+   -H "Content-Type: application/json" \
+   -d '{
+     "subject": "Problema con iluminación",
+     "message": "Las luces del pasillo del segundo piso están parpadeando"
+   }'
+
+3. INICIAR PAGO (Como Residente):
+   curl -X POST http://localhost:8000/api/administration/payments/initiate_payment/ \
+   -H "Authorization: Bearer {jwt_token}" \
+   -H "Content-Type: application/json" \
+   -d '{
+     "financial_fee_id": 1
+   }'
+
+===============================================================================
+                              📋 VALIDACIONES
+===============================================================================
+
+TAREAS:
+- title: Requerido, máximo 200 caracteres
+- description: Requerido
+- assigned_to: Debe ser un usuario activo
+- status: Debe ser uno de los valores válidos
+
+FEEDBACK:
+- subject: Requerido, no puede estar vacío después de quitar espacios
+- message: Requerido, mínimo 10 caracteres
+
+PAGOS:
+- financial_fee_id: Debe existir y estar activa
+- amount: Debe ser positivo y coincidir con el monto de la cuota
+- No se pueden crear transacciones duplicadas pendientes
+
+===============================================================================
+                            🎯 CASOS DE USO
+===============================================================================
+
+GESTIÓN DE TAREAS:
+1. Administrador crea tarea y la asigna a un empleado
+2. Empleado ve sus tareas pendientes
+3. Empleado actualiza el estado a "En Progreso"
+4. Al completar, empleado marca como "Completada"
+
+SISTEMA DE FEEDBACK:
+1. Residente identifica un problema o tiene una sugerencia
+2. Residente envía feedback a través del sistema
+3. Administrador revisa feedback pendiente en el dashboard
+4. Administrador actualiza estado y responde al residente
+
+GATEWAY DE PAGOS:
+1. Residente ve sus cuotas pendientes
+2. Residente inicia proceso de pago
+3. Sistema genera transacción con ID único
+4. Gateway externo procesa pago y envía webhook
+5. Sistema actualiza estado de la transacción
+
+===============================================================================
+                              ✅ IMPLEMENTADO
+===============================================================================
+
+✅ Modelos con validaciones completas
+✅ Serializers con campos calculados y validaciones
+✅ ViewSets con filtrado por permisos
+✅ Endpoints especiales para cada funcionalidad
+✅ Migración de base de datos aplicada
+✅ Datos de ejemplo cargados
+✅ Documentación técnica completa
+✅ Autenticación JWT integrada
+✅ Manejo de errores y validaciones
+
+¡FASE 5 DEL SMART CONDOMINIUM BACKEND COMPLETAMENTE IMPLEMENTADA!

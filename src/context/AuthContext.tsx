@@ -8,6 +8,7 @@ interface User {
   email?: string;
   first_name?: string;
   last_name?: string;
+  role_name?: string;
   displayName?: string;
   photoURL?: string;
 }
@@ -201,7 +202,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             setAccessToken(access); // Re-confirmar el token
             if (refresh) setRefreshToken(refresh); // Re-confirmar el refresh token
           }
-        } catch (error) {
+        } catch {
           if (controller.signal.aborted) return;
           
           console.log('[AuthContext] Error validating session, attempting refresh...');
@@ -218,7 +219,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                   setUser(userData);
                   setAccessToken(newToken);
                 }
-              } catch (retryError) {
+              } catch {
                 if (!controller.signal.aborted) {
                   console.error('[AuthContext] Session restoration failed');
                   logout();
@@ -233,7 +234,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             logout();
           }
         }
-      } catch (error) {
+      } catch {
         if (!controller.signal.aborted) {
           console.error('[AuthContext] Fatal initialization error');
           logout();
@@ -253,7 +254,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       controller.abort();
       initialized = false;
     };
-  }, []); // Mantener dependencias vacías para una única inicialización
+  }, [logout, refreshAccessToken]); // Incluir dependencias faltantes
 
   const initialize = useCallback(async () => {
     console.log('%c[DEBUG] Starting auth initialization...', 'color: #2196F3; font-weight: bold');
@@ -333,7 +334,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     });
 
     return contextValue;
-  }, [accessToken, refreshToken, user, isLoading, isInitialized, login, logout]);
+  }, [accessToken, refreshToken, user, isLoading, isInitialized, login, logout, initialize]);
 
   return (
     <AuthContext.Provider value={value}>

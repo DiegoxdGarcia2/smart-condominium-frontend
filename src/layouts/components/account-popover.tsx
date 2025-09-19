@@ -18,13 +18,6 @@ import { useAuth } from 'src/context/AuthContext';
 
 // ----------------------------------------------------------------------
 
-// Mock data local
-const _myAccount = {
-  displayName: 'Usuario Smart',
-  email: 'usuario@smartcondominium.com',
-  photoURL: '/assets/images/avatar/avatar-25.webp',
-};
-
 export type AccountPopoverProps = IconButtonProps & {
   data?: {
     label: string;

@@ -1,4 +1,4 @@
-import type { PaginatedResponse } from 'src/types/api-responses';
+﻿import type { PaginatedResponse } from 'src/types/api-responses';
 import type { FinancialFee, ResidentialUnit, FinancialFeeStatus, EditingFinancialFee } from 'src/types/financial-fee';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -23,6 +23,7 @@ import InputLabel from '@mui/material/InputLabel';
 import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 import FormControl from '@mui/material/FormControl';
+import Autocomplete from '@mui/material/Autocomplete';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 
@@ -30,11 +31,22 @@ import { useBoolean } from 'src/hooks/use-boolean';
 
 import { endpoints } from 'src/utils/axios';
 
+import { useAuth } from 'src/context/AuthContext';
+
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
 
 // ----------------------------------------------------------------------
+
+// Interfaz para usuarios desde la API
+interface User {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role_name: string;
+}
 
 // Función para transformar estados del backend (español) al frontend (inglés)
 const transformStatusFromBackend = (status: string): FinancialFeeStatus => {
@@ -81,29 +93,42 @@ const DEFAULT_FEE: EditingFinancialFee = {
 export function FinancesView() {
   const [fees, setFees] = useState<FinancialFee[]>([]);
   const [units, setUnits] = useState<ResidentialUnit[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [currentFee, setCurrentFee] = useState<EditingFinancialFee>(DEFAULT_FEE);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedUnit, setSelectedUnit] = useState<ResidentialUnit | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const modal = useBoolean();
   const deleteDialog = useBoolean();
   const { enqueueSnackbar } = useSnackbar();
-
-  const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
+  const { isAuthenticated, user } = useAuth();
 
   const getFees = useCallback(async (pageNum = 1) => {
+    // No hacer peticiones si no está autenticado
+    if (!isAuthenticated || !user) {
+      return;
+    }
+
     try {
       const response = await endpoints.get(`/administration/financial-fees/?page=${pageNum}`);
       const data = response.data as PaginatedResponse<FinancialFee>;
       
-      // Transformar los estados de español a inglés
+      // Transformar estados y establecer placeholder temporal solo si no hay datos de unidades/usuarios
       const transformedResults = data.results.map(fee => ({
         ...fee,
-        status: transformStatusFromBackend(fee.status as string)
+        status: transformStatusFromBackend(fee.status as string),
+        resident_name: fee.resident_name || 'Sin asignar' // Usar dato existente o placeholder
       }));
       
-      setFees(transformedResults);
-      setTotalCount(data.count);
+      // Ordenar por fecha de vencimiento (due_date) de la más reciente a la más antigua
+      const sortedResults = transformedResults.sort((a, b) => {
+        const dateA = new Date(a.due_date);
+        const dateB = new Date(b.due_date);
+        return dateB.getTime() - dateA.getTime(); // Orden descendente (más reciente primero)
+      });
+      
+      setFees(sortedResults);
     } catch (error: any) {
       console.error('Error fetching fees:', error);
       if (error.response?.status === 401) {
@@ -113,9 +138,14 @@ export function FinancesView() {
       }
       setFees([]);
     }
-  }, [enqueueSnackbar]);
+  }, [enqueueSnackbar, isAuthenticated, user]);
 
   const getUnits = useCallback(async () => {
+    // No hacer peticiones si no está autenticado
+    if (!isAuthenticated || !user) {
+      return;
+    }
+
     try {
       const response = await endpoints.get('/administration/residential-units/');
       const data = response.data as PaginatedResponse<ResidentialUnit>;
@@ -129,12 +159,141 @@ export function FinancesView() {
       }
       setUnits([]);
     }
-  }, [enqueueSnackbar]);
+  }, [enqueueSnackbar, isAuthenticated, user]);
+
+  const getUsers = useCallback(async () => {
+    // No hacer peticiones si no está autenticado
+    if (!isAuthenticated || !user) {
+      return;
+    }
+
+    try {
+      const response = await endpoints.get('/administration/users/');
+      const data = response.data as PaginatedResponse<User>;
+      setUsers(data.results);
+    } catch (error: any) {
+      console.error('Error fetching users:', error);
+      if (error.response?.status === 401) {
+        enqueueSnackbar('Sesión expirada, por favor vuelva a iniciar sesión', { variant: 'error' });
+      } else {
+        enqueueSnackbar('Error al cargar los usuarios', { variant: 'error' });
+      }
+      setUsers([]);
+    }
+  }, [enqueueSnackbar, isAuthenticated, user]);
 
   useEffect(() => {
-    getFees();
-    getUnits();
-  }, [getFees, getUnits]);
+    // Solo cargar datos si el usuario está autenticado
+    if (!isAuthenticated || !user) {
+      // Limpiar datos si no está autenticado
+      setFees([]);
+      setUnits([]);
+      setUsers([]);
+      return;
+    }
+
+    // Cargar todos los datos en paralelo para mayor velocidad
+    Promise.all([
+      getFees(),
+      getUnits(),
+      getUsers()
+    ]).catch(error => {
+      console.error('Error loading data:', error);
+    });
+  }, [isAuthenticated, user]); // Solo depende del estado de autenticación
+
+  // useEffect para enriquecer las cuotas cuando units y users estén disponibles
+  useEffect(() => {
+    if (fees.length > 0 && units.length > 0 && users.length > 0) {
+      // Solo enriquecer si aún hay cuotas sin nombre de residente o con "Sin asignar"
+      const needsEnrichment = fees.some(fee => 
+        !fee.resident_name || fee.resident_name === 'Sin asignar' || fee.resident_name === 'Cargando...'
+      );
+      
+      if (needsEnrichment) {
+        const enrichedFees = fees.map(fee => {
+          // Si ya tiene un nombre válido, mantenerlo
+          if (fee.resident_name && fee.resident_name !== 'Sin asignar' && fee.resident_name !== 'Cargando...') {
+            return fee;
+          }
+          
+          // Encontrar la unidad correspondiente
+          const unit = units.find(u => u.unit_number === fee.unit_number);
+          // Encontrar el usuario propietario
+          const resident = unit?.owner ? users.find(u => u.id === unit.owner) : null;
+          // Crear nombre completo del residente
+          const residentName = resident ? `${resident.first_name} ${resident.last_name}` : 'Sin asignar';
+          
+          return {
+            ...fee,
+            resident_name: residentName
+          };
+        });
+        
+        setFees(enrichedFees);
+      }
+    }
+  }, [fees, units, users]); // Incluir fees en las dependencias para detectar cuando necesita enriquecimiento
+
+  // Función para manejar el cambio de residente
+  const handleUserChange = (selectedUserParam: User | null) => {
+    setSelectedUser(selectedUserParam);
+    
+    if (selectedUserParam) {
+      // Buscar unidades del usuario seleccionado
+      const userUnits = units.filter(unit => unit.owner === selectedUserParam.id);
+      
+      if (userUnits.length === 1) {
+        // Si solo tiene una unidad, autocompletar
+        const singleUnit = userUnits[0];
+        setSelectedUnit(singleUnit);
+        setCurrentFee(prev => ({
+          ...prev,
+          unit_number: singleUnit.unit_number
+        }));
+      } else {
+        // Si tiene múltiples o ninguna unidad, limpiar el campo de unidad
+        setSelectedUnit(null);
+        setCurrentFee(prev => ({
+          ...prev,
+          unit_number: ''
+        }));
+      }
+    } else {
+      // Si no hay usuario seleccionado, limpiar todo
+      setSelectedUnit(null);
+      setCurrentFee(prev => ({
+        ...prev,
+        unit_number: ''
+      }));
+    }
+  };
+
+  // Función para manejar el cambio de unidad
+  const handleUnitChange = (unit: ResidentialUnit | null) => {
+    setSelectedUnit(unit);
+    
+    if (unit) {
+      setCurrentFee(prev => ({
+        ...prev,
+        unit_number: unit.unit_number
+      }));
+      
+      // Buscar el propietario de la unidad
+      if (unit.owner) {
+        const owner = users.find(u => u.id === unit.owner);
+        setSelectedUser(owner || null);
+      } else {
+        setSelectedUser(null);
+      }
+    } else {
+      setCurrentFee(prev => ({
+        ...prev,
+        unit_number: ''
+      }));
+      setSelectedUser(null);
+    }
+  };
 
   const handleCreateEdit = async () => {
     try {
@@ -145,15 +304,15 @@ export function FinancesView() {
       }
 
       // Encontrar el ID de la unidad basado en unit_number
-      const selectedUnit = units.find(unit => unit.unit_number === currentFee.unit_number);
-      if (!selectedUnit) {
+      const foundUnit = units.find(unit => unit.unit_number === currentFee.unit_number);
+      if (!foundUnit) {
         enqueueSnackbar('Unidad seleccionada no válida', { variant: 'error' });
         return;
       }
 
       // Limpiar y preparar los datos para el backend
       const cleanedData = {
-        unit: selectedUnit.id, // ✅ ID numérico de la unidad
+        unit: foundUnit.id, // ✅ ID numérico de la unidad
         description: currentFee.description,
         amount: parseFloat(currentFee.amount || '0').toFixed(2), // ✅ Formato decimal XX.XX
         due_date: currentFee.due_date || new Date().toISOString().split('T')[0],
@@ -209,14 +368,29 @@ export function FinancesView() {
         status: fee.status as FinancialFeeStatus, // El status debe estar en inglés desde la API
       };
       setCurrentFee(transformedFee);
+      
+      // Encontrar la unidad y usuario correspondientes para el autocompletado
+      const unit = units.find(u => u.unit_number === fee.unit_number);
+      setSelectedUnit(unit || null);
+      
+      if (unit?.owner) {
+        const foundUser = users.find(u => u.id === unit.owner);
+        setSelectedUser(foundUser || null);
+      } else {
+        setSelectedUser(null);
+      }
     } else {
       setCurrentFee(DEFAULT_FEE);
+      setSelectedUser(null);
+      setSelectedUnit(null);
     }
     modal.onTrue();
   };
 
   const handleCloseModal = () => {
     setCurrentFee(DEFAULT_FEE);
+    setSelectedUser(null);
+    setSelectedUnit(null);
     modal.onFalse();
   };
 
@@ -255,6 +429,7 @@ export function FinancesView() {
           <TableHead>
             <TableRow>
               <TableCell>Unidad</TableCell>
+              <TableCell>Residente</TableCell>
               <TableCell>Descripción</TableCell>
               <TableCell>Monto</TableCell>
               <TableCell>Fecha de Vencimiento</TableCell>
@@ -267,6 +442,7 @@ export function FinancesView() {
             {fees.map((fee) => (
               <TableRow key={fee.id}>
                 <TableCell>{fee.unit_number}</TableCell>
+                <TableCell>{fee.resident_name || 'Sin asignar'}</TableCell>
                 <TableCell>{fee.description}</TableCell>
                 <TableCell>${fee.amount}</TableCell>
                 <TableCell>{new Date(fee.due_date).toLocaleDateString()}</TableCell>
@@ -304,24 +480,41 @@ export function FinancesView() {
         <DialogTitle>{currentFee.id ? 'Editar Cuota' : 'Nueva Cuota'}</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2, display: 'grid', gap: 2 }}>
-            <FormControl fullWidth required>
-              <InputLabel>Unidad *</InputLabel>
-              <Select
-                value={currentFee.unit_number}
-                onChange={(e) =>
-                  setCurrentFee({ ...currentFee, unit_number: e.target.value as string })
-                }
-                label="Unidad *"
-              >
-                {Array.isArray(units) ? units.map((unit) => (
-                  <MenuItem key={unit.id} value={unit.unit_number}>
-                    {unit.unit_number}
-                  </MenuItem>
-                )) : (
-                  <MenuItem disabled>No hay unidades disponibles</MenuItem>
-                )}
-              </Select>
-            </FormControl>
+            <Autocomplete
+              options={users}
+              value={selectedUser}
+              onChange={(_, newValue) => handleUserChange(newValue)}
+              getOptionLabel={(option) => `${option.first_name} ${option.last_name}`}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Residente"
+                  placeholder="Buscar residente..."
+                  fullWidth
+                />
+              )}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+            />
+
+            <Autocomplete
+              options={selectedUser ? units.filter(unit => unit.owner === selectedUser.id) : units}
+              value={selectedUnit}
+              onChange={(_, newValue) => handleUnitChange(newValue)}
+              getOptionLabel={(option) => {
+                const unitType = option.unit_number.includes('-') ? 'Departamento' : 'Casa';
+                return `${option.unit_number} - ${unitType}`;
+              }}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Unidad *"
+                  placeholder="Buscar unidad..."
+                  fullWidth
+                  required
+                />
+              )}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
+            />
 
             <TextField
               label="Descripción *"

@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography';
 
 import { PetList } from '../pet-list';
 import { VehicleList } from '../vehicle-list';
+import { FeedbackList } from '../feedback-list';
 
 // ----------------------------------------------------------------------
 
@@ -57,6 +58,7 @@ export function AccountView() {
         <Tabs value={value} onChange={handleChange} aria-label="account tabs">
           <Tab label="Mis Vehículos" {...a11yProps(0)} />
           <Tab label="Mis Mascotas" {...a11yProps(1)} />
+          <Tab label="Sugerencias y Reclamos" {...a11yProps(2)} />
         </Tabs>
       </Box>
 
@@ -66,6 +68,10 @@ export function AccountView() {
 
       <CustomTabPanel value={value} index={1}>
         <PetList />
+      </CustomTabPanel>
+
+      <CustomTabPanel value={value} index={2}>
+        <FeedbackList />
       </CustomTabPanel>
     </Container>
   );

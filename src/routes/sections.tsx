@@ -13,6 +13,7 @@ import { DashboardLayout } from 'src/layouts/dashboard';
 
 // local imports
 import ProtectedRoute from './ProtectedRoute';
+import { RoleProtectedRoute } from './RoleProtectedRoute';
 
 // ----------------------------------------------------------------------
 
@@ -23,6 +24,10 @@ export const FinancesPage = lazy(() => import('src/pages/finances'));
 export const ReservationsPage = lazy(() => import('src/pages/reservations'));
 export const VisitorLogPage = lazy(() => import('src/pages/visitor-log'));
 export const AccountPage = lazy(() => import('src/pages/account'));
+export const UsersPage = lazy(() => import('src/pages/users'));
+export const UnitsPage = lazy(() => import('src/pages/units'));
+export const TasksPage = lazy(() => import('src/pages/tasks'));
+export const FeedbackPage = lazy(() => import('src/pages/feedback'));
 export const SignInPage = lazy(() => import('src/pages/sign-in'));
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
 
@@ -62,10 +67,49 @@ export const routesSection: RouteObject[] = [
           { index: true, element: <DashboardPage /> },
           { path: 'announcements', element: <AnnouncementsPage /> },
           { path: 'common-areas', element: <CommonAreasPage /> },
-          { path: 'finances', element: <FinancesPage /> },
+          { 
+            path: 'finances', 
+            element: (
+              <RoleProtectedRoute allowedRoles={['Administrador', 'Residente']}>
+                <FinancesPage />
+              </RoleProtectedRoute>
+            ) 
+          },
           { path: 'reservations', element: <ReservationsPage /> },
-          { path: 'visitor-log', element: <VisitorLogPage /> },
+          { 
+            path: 'visitor-log', 
+            element: (
+              <RoleProtectedRoute allowedRoles={['Administrador', 'Guardia']}>
+                <VisitorLogPage />
+              </RoleProtectedRoute>
+            ) 
+          },
           { path: 'account', element: <AccountPage /> },
+          { 
+            path: 'users', 
+            element: (
+              <RoleProtectedRoute allowedRoles={['Administrador']}>
+                <UsersPage />
+              </RoleProtectedRoute>
+            ) 
+          },
+          { 
+            path: 'units', 
+            element: (
+              <RoleProtectedRoute allowedRoles={['Administrador']}>
+                <UnitsPage />
+              </RoleProtectedRoute>
+            ) 
+          },
+          { path: 'tasks', element: <TasksPage /> },
+          { 
+            path: 'feedback', 
+            element: (
+              <RoleProtectedRoute allowedRoles={['Administrador']}>
+                <FeedbackPage />
+              </RoleProtectedRoute>
+            ) 
+          },
         ],
       },
     ],
