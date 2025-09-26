@@ -37,12 +37,16 @@ export function AnnouncementsView() {
   const { user } = useAuth();
   const [announcements, setAnnouncements] = useState<IAnnouncement[]>([]);
   const [open, setOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false); // Modal para ver detalles
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<IAnnouncement | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     content: '',
   });
   const [loading, setLoading] = useState(false);
+
+  // Detectar si es residente
+  const isResident = user?.role_name?.toLowerCase() === 'residente' || user?.role_name?.toLowerCase() === 'resident';
 
   // Obtención de datos
   const fetchAnnouncements = useCallback(async () => {
@@ -91,6 +95,17 @@ export function AnnouncementsView() {
       title: '',
       content: '',
     });
+  };
+
+  // Handler para ver detalles (solo lectura)
+  const handleViewDetails = (announcement: IAnnouncement) => {
+    setSelectedAnnouncement(announcement);
+    setViewOpen(true);
+  };
+
+  const handleCloseViewModal = () => {
+    setViewOpen(false);
+    setSelectedAnnouncement(null);
   };
 
   const handleInputChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,14 +186,16 @@ export function AnnouncementsView() {
       <Container maxWidth="xl">
         <Stack direction="row" alignItems="center" justifyContent="space-between" mb={5}>
           <Typography variant="h4">Comunicados</Typography>
-          <Button
-            variant="contained"
-            color="inherit"
-            startIcon={<Iconify icon="solar:check-circle-bold" />}
-            onClick={() => handleOpenModal()}
-          >
-            Nuevo Comunicado
-          </Button>
+          {!isResident && (
+            <Button
+              variant="contained"
+              color="inherit"
+              startIcon={<Iconify icon="solar:check-circle-bold" />}
+              onClick={() => handleOpenModal()}
+            >
+              Nuevo Comunicado
+            </Button>
+          )}
         </Stack>
 
         <Card>
@@ -187,10 +204,11 @@ export function AnnouncementsView() {
               <TableHead>
                 <TableRow>
                   <TableCell width="20%">Título</TableCell>
-                  <TableCell width="40%">Contenido</TableCell>
+                  <TableCell width={isResident ? "45%" : "40%"}>Contenido</TableCell>
                   <TableCell width="15%">Autor</TableCell>
                   <TableCell width="15%">Fecha de Creación</TableCell>
-                  <TableCell width="10%" align="right">Acciones</TableCell>
+                  {!isResident && <TableCell width="10%" align="right">Acciones</TableCell>}
+                  {isResident && <TableCell width="5%" align="right">Ver</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -221,16 +239,26 @@ export function AnnouncementsView() {
                       <TableCell>{row.author_name}</TableCell>
                       <TableCell>{fDate(row.created_at)}</TableCell>
                       <TableCell align="right">
-                        <IconButton onClick={() => handleOpenModal(row)} title="Editar">
-                          <Iconify icon="solar:pen-bold" />
-                        </IconButton>
-                        <IconButton 
-                          onClick={() => handleDelete(row.id)} 
-                          sx={{ color: 'error.main' }}
-                          title="Eliminar"
-                        >
-                          <Iconify icon="solar:trash-bin-trash-bold" />
-                        </IconButton>
+                        {isResident ? (
+                          // Solo botón de ver para residentes
+                          <IconButton onClick={() => handleViewDetails(row)} title="Ver detalles">
+                            <Iconify icon="solar:eye-bold" />
+                          </IconButton>
+                        ) : (
+                          // Botones de edición y eliminación para administradores
+                          <>
+                            <IconButton onClick={() => handleOpenModal(row)} title="Editar">
+                              <Iconify icon="solar:pen-bold" />
+                            </IconButton>
+                            <IconButton 
+                              onClick={() => handleDelete(row.id)} 
+                              sx={{ color: 'error.main' }}
+                              title="Eliminar"
+                            >
+                              <Iconify icon="solar:trash-bin-trash-bold" />
+                            </IconButton>
+                          </>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -247,6 +275,40 @@ export function AnnouncementsView() {
             </Table>
           </TableContainer>
         </Card>
+
+      {/* Modal de visualización para residentes */}
+      <Dialog
+        open={viewOpen}
+        onClose={handleCloseViewModal}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2 }
+        }}
+      >
+        <DialogTitle sx={{ pb: 2 }}>
+          <Typography variant="h5" component="div">
+            {selectedAnnouncement?.title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Autor: {selectedAnnouncement?.author_name} • {selectedAnnouncement && fDate(selectedAnnouncement.created_at)}
+          </Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ 
+            whiteSpace: 'pre-wrap', 
+            lineHeight: 1.6,
+            textAlign: 'justify'
+          }}>
+            {selectedAnnouncement?.content}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={handleCloseViewModal} variant="contained" color="primary">
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
 
         {/* Modal de Creación/Edición */}
         <Dialog open={open} onClose={handleCloseModal} maxWidth="sm" fullWidth>

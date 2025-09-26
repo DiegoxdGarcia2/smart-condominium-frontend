@@ -21,6 +21,8 @@ export const DashboardPage = lazy(() => import('src/pages/dashboard'));
 export const AnnouncementsPage = lazy(() => import('src/pages/announcements'));
 export const CommonAreasPage = lazy(() => import('src/pages/common-areas'));
 export const FinancesPage = lazy(() => import('src/pages/finances'));
+export const PaymentSuccessPage = lazy(() => import('src/components/payments/PaymentSuccess'));
+export const PaymentMethodPage = lazy(() => import('src/pages/payment-method'));
 export const ReservationsPage = lazy(() => import('src/pages/reservations'));
 export const VisitorLogPage = lazy(() => import('src/pages/visitor-log'));
 export const AccountPage = lazy(() => import('src/pages/account'));
@@ -75,6 +77,8 @@ export const routesSection: RouteObject[] = [
               </RoleProtectedRoute>
             ) 
           },
+          { path: 'payment-success', element: <PaymentSuccessPage /> },
+          { path: 'payments/method', element: <PaymentMethodPage /> },
           { path: 'reservations', element: <ReservationsPage /> },
           { 
             path: 'visitor-log', 

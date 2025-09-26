@@ -1,5 +1,7 @@
 import { useMemo, useState, useEffect, useContext, useCallback, createContext } from 'react';
 
+import { setTokenProvider } from 'src/utils/api';
+
 import api from '../services/api';
 
 // Tipos
@@ -335,6 +337,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
     return contextValue;
   }, [accessToken, refreshToken, user, isLoading, isInitialized, login, logout, initialize]);
+
+  // Ensure axios token provider reads the accessToken from this context
+  useEffect(() => {
+    try {
+      setTokenProvider(() => accessToken);
+    } catch (e) {
+      // noop
+    }
+  }, [accessToken]);
 
   return (
     <AuthContext.Provider value={value}>

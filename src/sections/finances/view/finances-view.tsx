@@ -4,7 +4,9 @@ import type { FinancialFee, ResidentialUnit, FinancialFeeStatus, EditingFinancia
 import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
+import Tabs from '@mui/material/Tabs';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
@@ -36,6 +38,8 @@ import { useAuth } from 'src/context/AuthContext';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
+
+import PaymentTab from '../../../components/payments/PaymentTab';
 
 // ----------------------------------------------------------------------
 
@@ -91,6 +95,12 @@ const DEFAULT_FEE: EditingFinancialFee = {
 };
 
 export function FinancesView() {
+  const [tabIndex, setTabIndex] = useState(0);
+
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
+    setTabIndex(newValue);
+  };
+
   const [fees, setFees] = useState<FinancialFee[]>([]);
   const [units, setUnits] = useState<ResidentialUnit[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -103,6 +113,8 @@ export function FinancesView() {
   const deleteDialog = useBoolean();
   const { enqueueSnackbar } = useSnackbar();
   const { isAuthenticated, user } = useAuth();
+  const role = user?.role_name?.toString().toLowerCase() || '';
+  const isResident = role.includes('resident') || role.includes('residente');
 
   const getFees = useCallback(async (pageNum = 1) => {
     // No hacer peticiones si no está autenticado
@@ -230,9 +242,17 @@ export function FinancesView() {
           };
         });
         
-        setFees(enrichedFees);
+        // If the current user is a resident, only show fees for their units
+        if (isResident && user?.id) {
+          const ownedUnitNumbers = units.filter(u => u.owner === user.id).map(u => u.unit_number);
+          const filtered = enrichedFees.filter(fee => ownedUnitNumbers.includes(fee.unit_number));
+          setFees(filtered);
+        } else {
+          setFees(enrichedFees);
+        }
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fees, units, users]); // Incluir fees en las dependencias para detectar cuando necesita enriquecimiento
 
   // Función para manejar el cambio de residente
@@ -415,16 +435,24 @@ export function FinancesView() {
         }}
       >
         <Typography variant="h4">Gestión de Finanzas</Typography>
-        <Button
-          variant="contained"
-          startIcon={<Iconify icon="mingcute:add-line" />}
-          onClick={() => handleOpenModal()}
-        >
-          Asignar Nueva Cuota
-        </Button>
+        {!isResident && (
+          <Button
+            variant="contained"
+            startIcon={<Iconify icon="mingcute:add-line" />}
+            onClick={() => handleOpenModal()}
+          >
+            Asignar Nueva Cuota
+          </Button>
+        )}
       </Box>
 
-      <Card>
+      <Tabs value={tabIndex} onChange={handleTabChange} sx={{ mb: 2 }}>
+        <Tab label="Cuotas" />
+        <Tab label="Pasarela de pagos" />
+      </Tabs>
+
+      {tabIndex === 0 && (
+        <Card>
         <Table>
           <TableHead>
             <TableRow>
@@ -459,22 +487,31 @@ export function FinancesView() {
                   </Label>
                 </TableCell>
                 <TableCell align="right">
-                  <Tooltip title="Editar">
-                    <IconButton onClick={() => handleOpenModal(fee)}>
-                      <Iconify icon="solar:pen-bold" />
-                    </IconButton>
-                  </Tooltip>
-                  <Tooltip title="Eliminar">
-                    <IconButton onClick={() => handleOpenDeleteDialog(fee.id)} color="error">
-                      <Iconify icon="solar:trash-bin-trash-bold" />
-                    </IconButton>
-                  </Tooltip>
+                  {!isResident && (
+                    <>
+                      <Tooltip title="Editar">
+                        <IconButton onClick={() => handleOpenModal(fee)}>
+                          <Iconify icon="solar:pen-bold" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Eliminar">
+                        <IconButton onClick={() => handleOpenDeleteDialog(fee.id)} color="error">
+                          <Iconify icon="solar:trash-bin-trash-bold" />
+                        </IconButton>
+                      </Tooltip>
+                    </>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
-      </Card>
+        </Card>
+      )}
+
+      {tabIndex === 1 && (
+        <PaymentTab onPaymentsUpdated={() => { void getFees(); }} />
+      )}
 
       <Dialog open={modal.value} onClose={handleCloseModal} maxWidth="sm" fullWidth>
         <DialogTitle>{currentFee.id ? 'Editar Cuota' : 'Nueva Cuota'}</DialogTitle>
