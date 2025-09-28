@@ -51,7 +51,7 @@ export function AccountView() {
   return (
     <Container maxWidth="lg">
       <Typography variant="h4" sx={{ mb: 5 }}>
-        Mi Cuenta
+        Mis Cosas
       </Typography>
 
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
