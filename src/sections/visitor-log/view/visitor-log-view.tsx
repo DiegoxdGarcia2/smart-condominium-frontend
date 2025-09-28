@@ -1,14 +1,19 @@
 import type { IResident, IVisitorLog, ICreateVisitorLog } from 'src/types/visitor-log';
 
+import axios from 'axios';
+import Webcam from 'react-webcam';
 import { useSnackbar } from 'notistack';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Select from '@mui/material/Select';
+import Avatar from '@mui/material/Avatar';
+import { blue } from '@mui/material/colors';
 import TableRow from '@mui/material/TableRow';
 import MenuItem from '@mui/material/MenuItem';
 import TableBody from '@mui/material/TableBody';
@@ -35,7 +40,7 @@ import { Iconify } from 'src/components/iconify';
 const initialFormValues: ICreateVisitorLog = {
   visitor_name: '',
   visitor_dni: '',
-  resident: 0,
+  resident: 0, // número para evitar error de tipo
   vehicle_license_plate: '',
   observations: '',
 };
@@ -51,6 +56,14 @@ export function VisitorLogView() {
   // Estados del modal
   const [open, setOpen] = useState(false);
   const [formValues, setFormValues] = useState<ICreateVisitorLog>(initialFormValues);
+  // IA: Foto visitante
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [showWebcam, setShowWebcam] = useState(false);
+  const webcamRef = React.useRef<Webcam>(null);
+  // Modal para ver foto
+  const [viewPhotoOpen, setViewPhotoOpen] = useState(false);
+  const [viewPhotoUrl, setViewPhotoUrl] = useState<string | null>(null);
 
   // Obtener registros de visitantes
   const fetchVisitorLogs = useCallback(async () => {
@@ -126,59 +139,51 @@ export function VisitorLogView() {
     }));
   };
 
-  // Registrar nueva visita
+  // Registrar nueva visita (IA: con foto)
   const handleCreateVisit = async () => {
     try {
-      if (!formValues.visitor_name || !formValues.visitor_dni || !formValues.resident) {
+  if (!formValues.visitor_name || !formValues.visitor_dni || !formValues.resident) {
         enqueueSnackbar('Por favor completa todos los campos obligatorios', { variant: 'warning' });
         return;
       }
-
-      // Validación del DNI (debe tener al menos 7 caracteres según el backend)
       if (formValues.visitor_dni.trim().length < 7) {
         enqueueSnackbar('El DNI debe tener al menos 7 caracteres', { variant: 'warning' });
         return;
       }
-
-      // Validación del residente seleccionado
-      if (formValues.resident <= 0) {
+      if (!formValues.resident || formValues.resident === 0) {
         enqueueSnackbar('Por favor selecciona un residente válido', { variant: 'warning' });
         return;
       }
-
-      // Crear payload limpio sin campos undefined
-      const payload: any = {
-        visitor_name: formValues.visitor_name.trim(),
-        visitor_dni: formValues.visitor_dni.trim(),
-        resident: formValues.resident,
-      };
-
-      // Solo añadir campos opcionales si tienen valor
+      // Crear FormData
+      const formData = new FormData();
+      formData.append('visitor_name', formValues.visitor_name.trim());
+      formData.append('visitor_dni', formValues.visitor_dni.trim());
+  formData.append('resident', String(formValues.resident));
       if (formValues.vehicle_license_plate && formValues.vehicle_license_plate.trim()) {
-        payload.vehicle_license_plate = formValues.vehicle_license_plate.trim();
+        formData.append('vehicle_license_plate', formValues.vehicle_license_plate.trim());
       }
-
       if (formValues.observations && formValues.observations.trim()) {
-        payload.observations = formValues.observations.trim();
+        formData.append('observations', formValues.observations.trim());
       }
-
-      console.log('Sending payload:', payload);
-      console.log('Form values:', formValues);
-
-      await endpoints.post('/administration/visitor-logs/', payload);
-      
+      if (photoFile) {
+  formData.append('visitor_photo', photoFile);
+      }
+      // Obtener token de autenticación
+      const accessToken = localStorage.getItem('accessToken');
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://smart-condominium-backend-fuab.onrender.com';
+  await axios.post(`${API_BASE}/api/administration/visitor-logs/`, formData, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
       enqueueSnackbar('Visita registrada correctamente', { variant: 'success' });
       handleClose();
       fetchVisitorLogs();
     } catch (error: any) {
       console.error('Error creating visitor log:', error);
-      console.error('Error response:', error.response?.data);
-      console.error('Error status:', error.response?.status);
-      
-      // Mostrar error específico del backend si está disponible
       if (error.response?.data) {
-        const errorMessage = typeof error.response.data === 'string' 
-          ? error.response.data 
+        const errorMessage = typeof error.response.data === 'string'
+          ? error.response.data
           : JSON.stringify(error.response.data);
         enqueueSnackbar(`Error: ${errorMessage}`, { variant: 'error' });
       } else {
@@ -205,6 +210,19 @@ export function VisitorLogView() {
       }
     }
   };
+
+  // Utilidad para asegurar URL absoluta de la foto
+  function getAbsolutePhotoUrl(photoUrl?: string): string | undefined {
+    if (!photoUrl) return undefined;
+    if (photoUrl.startsWith('http')) return photoUrl;
+    // Si es relativa, anteponer Cloudinary
+    return `https://res.cloudinary.com/dowmpqgux/${photoUrl.replace(/^\/+/, '')}`;
+  }
+
+  // Log para depuración de fotos
+  useEffect(() => {
+    console.log('visitorLogs:', visitorLogs);
+  }, [visitorLogs]);
 
   return (
     <Container>
@@ -238,6 +256,7 @@ export function VisitorLogView() {
                 <TableCell>Hora de Entrada</TableCell>
                 <TableCell>Hora de Salida</TableCell>
                 <TableCell>Placa del Vehículo</TableCell>
+                <TableCell>Foto</TableCell>
                 <TableCell>Estado</TableCell>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>
@@ -294,6 +313,17 @@ export function VisitorLogView() {
                       {visitorLog.vehicle_license_plate || '-'}
                     </TableCell>
                     <TableCell>
+                      {visitorLog.visitor_photo ? (
+                        <IconButton onClick={() => { setViewPhotoUrl(getAbsolutePhotoUrl(visitorLog.visitor_photo) || null); setViewPhotoOpen(true); }}>
+                          <Avatar src={getAbsolutePhotoUrl(visitorLog.visitor_photo)} alt="Foto" sx={{ width: 40, height: 40 }} />
+                        </IconButton>
+                      ) : (
+                        <Avatar sx={{ width: 40, height: 40, bgcolor: blue[100], color: blue[700] }}>
+                          <Iconify icon="solar:pen-bold" />
+                        </Avatar>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <Box
                         sx={{
                           px: 1,
@@ -339,6 +369,62 @@ export function VisitorLogView() {
         <DialogTitle>Registrar Nueva Visita</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* IA: Captura de foto */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => setShowWebcam((prev) => !prev)}
+                startIcon={<Iconify icon="solar:pen-bold" />}
+              >
+                Capturar Foto
+              </Button>
+              <Chip
+                label="Función con IA"
+                color="info"
+                icon={<Iconify icon="solar:share-bold" />}
+                sx={{ fontWeight: 'bold', fontSize: 13 }}
+              />
+            </Box>
+            {showWebcam && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, mt: 2 }}>
+                <Webcam
+                  audio={false}
+                  ref={webcamRef}
+                  screenshotFormat="image/jpeg"
+                  width={260}
+                  height={180}
+                  style={{ borderRadius: 8, border: '2px solid #1976d2' }}
+                />
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => {
+                    if (webcamRef.current) {
+                      const imageSrc = webcamRef.current.getScreenshot();
+                      setPhotoPreview(imageSrc);
+                      // Convertir base64 a File
+                      if (imageSrc) {
+                        fetch(imageSrc)
+                          .then(res => res.blob())
+                          .then(blob => {
+                            setPhotoFile(new File([blob], `visitor_photo_${Date.now()}.jpg`, { type: 'image/jpeg' }));
+                          });
+                      }
+                    }
+                  }}
+                  startIcon={<Iconify icon="solar:pen-bold" />}
+                >
+                  Tomar Foto
+                </Button>
+              </Box>
+            )}
+            {photoPreview && (
+              <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" color="text.secondary">Vista previa de la foto:</Typography>
+                <Avatar src={photoPreview} alt="Preview" sx={{ width: 80, height: 80, border: '2px solid #1976d2' }} />
+              </Box>
+            )}
             <TextField
               fullWidth
               label="Nombre del Visitante"
@@ -360,8 +446,9 @@ export function VisitorLogView() {
               <Select
                 value={formValues.resident}
                 label="Residente Visitado"
-                onChange={(e) => handleInputChange('resident', e.target.value as number)}
+                onChange={(e) => handleInputChange('resident', Number(e.target.value))}
               >
+                <MenuItem value={0}>Seleccione un residente</MenuItem>
                 {Array.isArray(residents) && residents.length > 0 ? (
                   residents.map((resident) => (
                     <MenuItem key={resident.id} value={resident.id}>
@@ -398,6 +485,23 @@ export function VisitorLogView() {
           <Button variant="contained" onClick={handleCreateVisit}>
             Registrar Visita
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de vista previa de foto */}
+      <Dialog open={viewPhotoOpen} onClose={() => setViewPhotoOpen(false)} maxWidth="xs">
+        <DialogTitle>Foto del Visitante</DialogTitle>
+        <DialogContent>
+          {viewPhotoUrl ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+              <img src={viewPhotoUrl} alt="Foto del visitante" style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 8 }} />
+            </Box>
+          ) : (
+            <Typography>No hay foto disponible.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewPhotoOpen(false)} color="primary">Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Container>

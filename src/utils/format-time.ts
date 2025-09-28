@@ -1,6 +1,7 @@
 import type { Dayjs } from 'dayjs';
 
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import duration from 'dayjs/plugin/duration';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
@@ -30,6 +31,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
+dayjs.extend(utc);
 
 // ----------------------------------------------------------------------
 
@@ -87,8 +89,8 @@ export function fTime(date: DatePickerFormat, template?: string): string {
   if (!isValidDate(date)) {
     return 'Invalid time';
   }
-
-  return dayjs(date).format(template ?? 'h:mm A');
+  // Mostrar la hora en UTC tal como está en la BD
+  return dayjs.utc(date).format(template ?? 'HH:mm');
 }
 
 // ----------------------------------------------------------------------

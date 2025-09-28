@@ -16,6 +16,7 @@ export interface IVisitorLog {
   status: 'Activo' | 'Salió';
   observations: string | null;
   duration_minutes: number | null;
+  visitor_photo?: string; // URL de la foto del visitante
 }
 
 export interface ICreateVisitorLog {

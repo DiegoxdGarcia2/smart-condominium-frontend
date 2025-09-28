@@ -8,6 +8,10 @@ export interface FinancialFee {
   amount: string;
   due_date: string;
   status: FinancialFeeStatus;
+  // IA: campos para predicción de riesgo
+  historical_default_rate?: number;
+  previous_overdue_count?: number;
+  days_since_due?: number;
 }
 
 export interface EditingFinancialFee {

@@ -33,6 +33,8 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { endpoints } from 'src/utils/axios';
 import { fDate, fTime } from 'src/utils/format-time';
 
+import { useAuth } from 'src/context/AuthContext';
+
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { useSnackbar } from 'src/components/snackbar';
@@ -72,6 +74,7 @@ export function ReservationsView() {
 
   const createModal = useBoolean();
   const { enqueueSnackbar } = useSnackbar();
+  const { user } = useAuth();
 
   const fetchReservations = useCallback(async () => {
     try {
@@ -123,10 +126,15 @@ export function ReservationsView() {
   }, [fetchReservations, fetchCommonAreas, fetchUsers]);
 
   useEffect(() => {
+    let visibleReservations = reservations;
+    // Si el usuario es residente, solo mostrar sus reservas
+    if (user?.role_name === 'Residente' && user?.id) {
+      visibleReservations = reservations.filter((reservation) => String(reservation.resident) === String(user.id));
+    }
     if (currentTab === 'Todas') {
-      setFilteredReservations(reservations);
+      setFilteredReservations(visibleReservations);
     } else {
-      setFilteredReservations(reservations.filter((reservation) => reservation.status === currentTab));
+      setFilteredReservations(visibleReservations.filter((reservation) => reservation.status === currentTab));
     }
   }, [reservations, currentTab]);
 
@@ -172,10 +180,21 @@ export function ReservationsView() {
   };
 
   const handleFormChange = (field: string, value: any) => {
-    setFormValues(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+    setFormValues((prev) => {
+      // Si el campo cambiado es el área común, autocompletar el precio
+      if (field === 'common_area_id') {
+        const selectedArea = commonAreas.find(area => String(area.id) === String(value));
+        return {
+          ...prev,
+          [field]: value,
+          total_paid: selectedArea ? selectedArea.booking_price : '',
+        };
+      }
+      return {
+        ...prev,
+        [field]: value,
+      };
+    });
   };
 
   const handleCreateReservation = async () => {
@@ -236,6 +255,16 @@ export function ReservationsView() {
     }
   };
 
+  // En el modal de creación, solo permitir seleccionar el propio usuario si es residente
+  const isResident = user?.role_name === 'Residente';
+
+  // Al abrir el modal de creación, autocompletar el usuario si es residente
+  useEffect(() => {
+    if (createModal.value && isResident && user?.id) {
+      setFormValues((prev) => ({ ...prev, user_id: String(user.id) }));
+    }
+  }, [createModal.value, isResident, user]);
+
   return (
     <Container>
       <Box
@@ -289,46 +318,45 @@ export function ReservationsView() {
           </TableHead>
 
           <TableBody>
-            {Array.isArray(filteredReservations) && filteredReservations.length > 0 ? (
-              filteredReservations.map((reservation) => (
-                <TableRow key={reservation.id}>
-                  <TableCell>{reservation.common_area_name}</TableCell>
-                  <TableCell>{reservation.resident_name}</TableCell>
-                  <TableCell>{fDate(reservation.start_time)}</TableCell>
-                  <TableCell>
-                    {fTime(reservation.start_time)} - {fTime(reservation.end_time)}
-                  </TableCell>
-                  <TableCell>
-                    <Label
-                      variant="soft"
-                      color={STATUS_COLORS[reservation.status]}
-                    >
-                      {reservation.status}
-                    </Label>
-                  </TableCell>
-                  <TableCell>${reservation.total_paid}</TableCell>
-                  <TableCell align="right">
-                    <IconButton
-                      onClick={(event) => handleOpenMenu(event, reservation)}
-                      size="small"
-                    >
-                      <Iconify icon="eva:more-vertical-fill" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} align="center">
-                  <Typography variant="body2" color="text.secondary">
-                    {currentTab === 'Todas' 
-                      ? 'No hay reservas registradas' 
-                      : `No hay reservas ${currentTab.toLowerCase()}`
-                    }
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            )}
+            {Array.isArray(filteredReservations) && filteredReservations.length > 0
+              ? filteredReservations.map((reservation) => (
+                  <TableRow key={reservation.id}>
+                    <TableCell>{reservation.common_area_name}</TableCell>
+                    <TableCell>{reservation.resident_name}</TableCell>
+                    <TableCell>{fDate(reservation.start_time)}</TableCell>
+                    <TableCell>
+                      {fTime(reservation.start_time)} - {fTime(reservation.end_time)}
+                    </TableCell>
+                    <TableCell>
+                      <Label
+                        variant="soft"
+                        color={STATUS_COLORS[reservation.status]}
+                      >
+                        {reservation.status}
+                      </Label>
+                    </TableCell>
+                    <TableCell>${reservation.total_paid}</TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        onClick={(event) => handleOpenMenu(event, reservation)}
+                        size="small"
+                      >
+                        <Iconify icon="eva:more-vertical-fill" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+              : (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Typography variant="body2" color="text.secondary">
+                        {currentTab === 'Todas'
+                          ? 'No hay reservas registradas'
+                          : `No hay reservas ${currentTab.toLowerCase()}`}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
           </TableBody>
         </Table>
       </Card>
@@ -396,12 +424,17 @@ export function ReservationsView() {
                 value={formValues.user_id}
                 onChange={(e) => handleFormChange('user_id', e.target.value)}
                 label="Residente"
+                disabled={isResident}
               >
-                {users.map((user) => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {user.first_name} {user.last_name} ({user.email})
-                  </MenuItem>
-                ))}
+                {isResident ? (
+                  <MenuItem value={user?.id}>{user?.first_name} {user?.last_name} ({user?.email})</MenuItem>
+                ) : (
+                  users.map((userItem) => (
+                    <MenuItem key={userItem.id} value={userItem.id}>
+                      {userItem.first_name} {userItem.last_name} ({userItem.email})
+                    </MenuItem>
+                  ))
+                )}
               </Select>
             </FormControl>
 

@@ -1,0 +1,57 @@
+{
+  "info": {
+    "name": "Smart Condominium IA",
+    "description": "Colección para probar funcionalidades IA: registro de visita con foto y predicción de riesgo de morosidad",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Registrar Visita con Foto",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{jwt_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "visitor_name", "value": "Juan Perez", "type": "text" },
+            { "key": "visitor_dni", "value": "12345678", "type": "text" },
+            { "key": "resident", "value": "1", "type": "text" },
+            { "key": "vehicle_license_plate", "value": "ABC123", "type": "text" },
+            { "key": "observations", "value": "Visita de prueba", "type": "text" },
+            { "key": "photo", "type": "file", "src": "" }
+          ]
+        },
+        "url": {
+          "raw": "{{api_base}}/api/administration/visitor-logs/",
+          "host": ["{{api_base}}"],
+          "path": ["api", "administration", "visitor-logs", ""]
+        }
+      }
+    },
+    {
+      "name": "Predicción de Riesgo de Morosidad",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{jwt_token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"financial_fee_id\": 1\n}"
+        },
+        "url": {
+          "raw": "{{api_base}}/api/administration/ai/predict_payment_risk/",
+          "host": ["{{api_base}}"],
+          "path": ["api", "administration", "ai", "predict_payment_risk", ""]
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "api_base", "value": "https://TU_BACKEND_RENDER" },
+    { "key": "jwt_token", "value": "TU_TOKEN_JWT" }
+  ]
+}

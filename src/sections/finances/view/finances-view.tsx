@@ -7,6 +7,7 @@ import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
 import Tabs from '@mui/material/Tabs';
+import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
@@ -28,6 +29,7 @@ import FormControl from '@mui/material/FormControl';
 import Autocomplete from '@mui/material/Autocomplete';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
@@ -95,6 +97,39 @@ const DEFAULT_FEE: EditingFinancialFee = {
 };
 
 export function FinancesView() {
+  // IA: Estado para predicción de riesgo
+  const [predictLoadingId, setPredictLoadingId] = useState<number | null>(null);
+  const [predictionResult, setPredictionResult] = useState<{ feeId: number, risk: number } | null>(null);
+  const [predictDialogOpen, setPredictDialogOpen] = useState(false);
+  // IA: Función para analizar riesgo de morosidad
+  const handlePredictRisk = async (feeId: number) => {
+    setPredictLoadingId(feeId);
+    setPredictionResult(null);
+    try {
+      // Buscar la cuota seleccionada
+      const fee = fees.find(f => f.id === feeId);
+      if (!fee) {
+        enqueueSnackbar('No se encontró la cuota seleccionada', { variant: 'error' });
+        setPredictLoadingId(null);
+        return;
+      }
+      // Construir el payload solo con el ID
+      const payload = {
+        financial_fee_id: fee.id
+      };
+      const response = await endpoints.post('/administration/ai/predict_payment_risk/', payload);
+      if (response.data && typeof response.data.risk_probability === 'number') {
+        setPredictionResult({ feeId, risk: response.data.risk_probability });
+        setPredictDialogOpen(true);
+      } else {
+        enqueueSnackbar('Respuesta inesperada de IA', { variant: 'warning' });
+      }
+    } catch (error: any) {
+      enqueueSnackbar('Error al analizar riesgo con IA', { variant: 'error' });
+    } finally {
+      setPredictLoadingId(null);
+    }
+  };
   const [tabIndex, setTabIndex] = useState(0);
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -488,7 +523,7 @@ export function FinancesView() {
                 </TableCell>
                 <TableCell align="right">
                   {!isResident && (
-                    <>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
                       <Tooltip title="Editar">
                         <IconButton onClick={() => handleOpenModal(fee)}>
                           <Iconify icon="solar:pen-bold" />
@@ -499,7 +534,27 @@ export function FinancesView() {
                           <Iconify icon="solar:trash-bin-trash-bold" />
                         </IconButton>
                       </Tooltip>
-                    </>
+                      {fee.status === 'pending' && (
+                        <Tooltip title="Analizar Riesgo de Morosidad con IA">
+                          <span>
+                            <IconButton
+                              color="info"
+                              onClick={() => handlePredictRisk(fee.id)}
+                              disabled={predictLoadingId === fee.id}
+                            >
+                              <Chip
+                                label="IA"
+                                color="info"
+                                size="small"
+                                icon={<Iconify icon="solar:share-bold" />}
+                                sx={{ mr: 1, fontWeight: 'bold', fontSize: 13 }}
+                              />
+                              {predictLoadingId === fee.id ? <CircularProgress size={22} /> : <Iconify icon="solar:pen-bold" />}
+                            </IconButton>
+                          </span>
+                        </Tooltip>
+                      )}
+                    </Box>
                   )}
                 </TableCell>
               </TableRow>
@@ -622,6 +677,40 @@ export function FinancesView() {
           <Button onClick={handleDelete} variant="contained" color="error">
             Eliminar
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de resultado de IA */}
+      <Dialog open={predictDialogOpen} onClose={() => setPredictDialogOpen(false)} maxWidth="xs">
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Iconify icon="solar:share-bold" color="#1976d2" width={28} />
+            Análisis de Riesgo con IA
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {predictionResult ? (
+            <Box sx={{ py: 2, textAlign: 'center' }}>
+              <Typography variant="h6" gutterBottom>
+                La probabilidad de que esta cuota entre en mora es del <b>{Math.round(predictionResult.risk * 100)}%</b>.
+              </Typography>
+              {/* Etiqueta de nivel de riesgo */}
+              {predictionResult.risk >= 0.7 ? (
+                <Label color="error" variant="filled">Riesgo Alto</Label>
+              ) : predictionResult.risk >= 0.4 ? (
+                <Label color="warning" variant="filled">Riesgo Medio</Label>
+              ) : (
+                <Label color="success" variant="filled">Riesgo Bajo</Label>
+              )}
+            </Box>
+          ) : (
+            <Box sx={{ py: 2, textAlign: 'center' }}>
+              <Typography variant="body2">Cargando análisis...</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPredictDialogOpen(false)} variant="contained">Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Container>
