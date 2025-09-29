@@ -18,6 +18,7 @@ export default function PaymentMethodPage() {
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'info'|'error' }>(() => ({ open: false, message: '', severity: 'info' }));
 
   const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '') || 'http://localhost:8000';
+  const FRONTEND_BASE = (import.meta.env.VITE_FRONTEND_BASE_URL || '').replace(/\/$/, '') || 'http://localhost:3039';
 
   const closeSnackbar = () => setSnackbar(s => ({ ...s, open: false }));
 
@@ -67,7 +68,7 @@ export default function PaymentMethodPage() {
                 return;
               }
               if (tx) {
-                window.location.href = `/payment-success?transaction_id=${encodeURIComponent(tx)}`;
+                window.location.href = `${FRONTEND_BASE}/payment-success?transaction_id=${encodeURIComponent(tx)}`;
                 return;
               }
               setSnackbar({ open: true, message: 'Pago iniciado pero no se devolvió URL', severity: 'error' });
@@ -134,7 +135,7 @@ export default function PaymentMethodPage() {
               }
               if (sessionId) {
                 try { localStorage.setItem('pendingPaymentSession', sessionId); } catch (err) { console.warn('[PaymentMethod] localStorage write failed', err); }
-                window.location.href = `/payment-success?transaction_id=${encodeURIComponent(sessionId)}`;
+                window.location.href = `${FRONTEND_BASE}/payment-success?transaction_id=${encodeURIComponent(sessionId)}`;
                 return;
               }
             }
