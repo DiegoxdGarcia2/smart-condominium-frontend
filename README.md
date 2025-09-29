@@ -1,52 +1,228 @@
-## Minimal UI ([Free version](https://free.minimals.cc/))
+# Smart Condominium - Frontend
 
 ![license](https://img.shields.io/badge/license-MIT-blue.svg)
 
-![preview](public/assets/images/minimal-free-preview.jpg)
+Aplicación web frontend para la gestión inteligente de condominios, desarrollada con React, TypeScript, Material-UI y Vite.js.
 
-> Free React Admin Dashboard made with Material-UI components and React + Vite.js.
+## 🚀 Características Principales
 
-## Pages
+### 👥 Gestión de Usuarios por Roles
+- **Administrador**: Control total del condominio (finanzas, usuarios, unidades, áreas comunes)
+- **Residente**: Gestión personal (pagos, reservas, vehículos, mascotas)
+- **Guardia**: Control de acceso y registro de visitas
 
-- [Dashboard](https://free.minimals.cc/)
-- [Users](https://free.minimals.cc/user)
-- [Products](https://free.minimals.cc/products)
-- [Blog](https://free.minimals.cc/blog)
-- [Sign in](https://free.minimals.cc/sign-in)
-- [Not found](https://free.minimals.cc/404)
+### 📊 Dashboards Personalizados
+- Dashboard administrativo con KPIs financieros y operativos
+- Dashboard de residente con estado de pagos y reservas
+- Dashboard de guardia con métricas de seguridad y tareas
 
-## Quick start
+### 💰 Sistema de Pagos Integrado
+- Integración completa con Stripe Checkout
+- Gestión de cuotas de mantenimiento y pagos pendientes
+- Confirmación automática de transacciones
 
-- Clone the repo: `git clone https://github.com/minimal-ui-kit/material-kit-react.git`
-- Recommended: `Node.js v20.x`
-- **Install:** `npm i` or `yarn install`
-- **Start:** `npm run dev` or `yarn dev`
-- **Build:** `npm run build` or `yarn build`
-- Open browser: `http://localhost:3039`
+### 🏢 Gestión de Condominio
+- **Finanzas**: Seguimiento de ingresos, cuotas y pagos
+- **Usuarios**: Administración de residentes y roles
+- **Unidades**: Gestión de propiedades del condominio
+- **Áreas Comunes**: Reservas de espacios compartidos
+- **Registro de Visitas**: Control de acceso de visitantes
+- **Tareas**: Asignación y seguimiento de tareas de mantenimiento
 
-## Backend API configuration
+### 📱 Funcionalidades Adicionales
+- **Comunicados**: Sistema de anuncios y notificaciones
+- **Reservas**: Gestión de espacios comunes
+- **Vehículos y Mascotas**: Registro de bienes personales
+- **Feedback**: Sistema de retroalimentación
 
-This project reads the backend base URL from the Vite environment variable `VITE_API_BASE_URL`.
+## 🛠️ Tecnologías Utilizadas
 
-1. Copy `.env.example` to `.env` at the project root:
+- **Frontend Framework**: React 18 con TypeScript
+- **Build Tool**: Vite.js
+- **UI Library**: Material-UI (MUI) v6
+- **Routing**: React Router v6
+- **HTTP Client**: Axios
+- **State Management**: React Context API
+- **Icons**: Iconify (Solar icon set)
+- **Charts**: Custom components con ApexCharts
+- **Payments**: Stripe Checkout integration
 
-	- On Windows PowerShell: `cp .env.example .env`
+## 📋 Prerrequisitos
 
-2. Edit `.env` and set `VITE_API_BASE_URL` to your backend address. Example value used during development:
+- Node.js v20.x o superior
+- npm o yarn
+- Backend API corriendo (ver repositorio backend)
 
-	VITE_API_BASE_URL=https://smart-condominium-backend-fuab.onrender.com
+## 🚀 Instalación y Configuración
 
-Note: `.env` is ignored by git (see `.gitignore`). We provide `.env.example` so each developer can configure their own local backend without committing secrets.
+### 1. Clonar el repositorio
+```bash
+git clone https://github.com/DiegoxdGarcia2/smart-condominium-frontend.git
+cd smart-condominium-frontend
+```
 
-## Pasarela de pagos (integración)
+### 2. Instalar dependencias
+```bash
+npm install
+```
 
-Este repo incluye componentes para una pestaña de "Pasarela de pagos" usando el backend desplegado en Render y Stripe Checkout.
+### 3. Configurar variables de entorno
 
-Dependencias necesarias:
+Copia el archivo de ejemplo:
+```bash
+cp .env.example .env
+```
 
-- axios
-- @mui/material @mui/icons-material @emotion/react @emotion/styled
-- (opcional) @mui/x-data-grid
+Edita `.env` con tus configuraciones:
+```env
+# URL del backend API
+VITE_API_BASE_URL=https://smart-condominium-backend-fuab.onrender.com
+
+# URL del frontend (para redirecciones de pago)
+VITE_FRONTEND_BASE_URL=https://smart-condominium-frontend.vercel.app
+```
+
+### 4. Iniciar servidor de desarrollo
+```bash
+npm run dev
+```
+
+La aplicación estará disponible en `http://localhost:3039`
+
+## 📁 Estructura del Proyecto
+
+```
+src/
+├── app.tsx                 # Punto de entrada principal
+├── main.tsx               # Renderizado de React
+├── config-global.ts       # Configuración global
+├── global.css            # Estilos globales
+├── vite-env.d.ts         # Tipos de Vite
+├── _mock/                # Datos de prueba
+├── components/           # Componentes reutilizables
+│   ├── chart/           # Componentes de gráficos
+│   ├── color-utils/     # Utilidades de color
+│   ├── iconify/         # Componentes de iconos
+│   ├── label/           # Etiquetas y badges
+│   ├── logo/            # Logo del proyecto
+│   ├── scrollbar/       # Scrollbar personalizado
+│   └── svg-color/       # Colores SVG
+├── context/             # Context API (AuthContext)
+├── layouts/             # Layouts de la aplicación
+│   ├── dashboard/       # Layout principal del dashboard
+│   └── nav-config-*/    # Configuración de navegación
+├── pages/               # Páginas principales
+│   ├── account.tsx      # Página de cuenta personal
+│   ├── announcements.tsx # Comunicados
+│   ├── dashboard.tsx    # Dashboard principal
+│   ├── finances.tsx     # Finanzas
+│   ├── guard-dashboard.tsx # Dashboard de guardia
+│   ├── payment-method.tsx # Método de pago
+│   ├── resident-dashboard.tsx # Dashboard de residente
+│   ├── sign-in.tsx      # Inicio de sesión
+│   └── page-not-found.tsx # Página 404
+├── routes/              # Configuración de rutas
+├── sections/            # Secciones de la aplicación
+│   ├── account/         # Gestión de cuenta personal
+│   ├── announcements/   # Comunicados
+│   ├── common-areas/    # Áreas comunes
+│   ├── feedback/        # Sistema de feedback
+│   ├── finances/        # Finanzas
+│   ├── overview/        # Dashboards
+│   ├── reservations/    # Reservas
+│   ├── tasks/           # Tareas
+│   ├── units/           # Unidades
+│   ├── users/           # Gestión de usuarios
+│   └── visitor-log/     # Registro de visitas
+├── services/            # Servicios API
+├── theme/               # Tema y configuración visual
+├── types/               # Definiciones TypeScript
+└── utils/               # Utilidades
+```
+
+## 🔧 Scripts Disponibles
+
+```bash
+# Desarrollo
+npm run dev          # Iniciar servidor de desarrollo
+npm run start        # Vista previa de producción
+
+# Construcción
+npm run build        # Construir para producción
+npm run preview      # Vista previa del build
+
+# Calidad de código
+npm run lint         # Ejecutar ESLint
+npm run lint:fix     # Corregir errores de ESLint
+npm run fm:check     # Verificar formato con Prettier
+npm run fm:fix       # Corregir formato con Prettier
+npm run fix:all      # Corregir linting y formato
+```
+
+## 🔐 Autenticación
+
+La aplicación utiliza JWT (JSON Web Tokens) para autenticación:
+
+1. **Inicio de sesión**: `POST /api/token/`
+2. **Refresh token**: `POST /api/token/refresh/`
+3. Los tokens se almacenan en localStorage
+4. Axios interceptors manejan automáticamente la autenticación
+
+## 💳 Integración de Pagos
+
+### Configuración de Stripe
+1. Obtén tus claves de Stripe (modo test para desarrollo)
+2. Configura webhooks en el backend para eventos de pago
+3. Las URLs de éxito/error se configuran automáticamente
+
+### Flujo de Pago
+1. Usuario selecciona cuota a pagar
+2. Frontend solicita sesión de pago al backend
+3. Backend crea sesión de Stripe Checkout
+4. Usuario es redirigido a Stripe para completar pago
+5. Después del pago, redirección automática a página de éxito
+6. Backend confirma transacción vía webhook
+
+### Tarjetas de Prueba (Stripe Test Mode)
+- **Número**: 4242 4242 4242 4242
+- **Fecha**: Cualquier fecha futura
+- **CVC**: Cualquier 3 dígitos
+
+## 🚀 Despliegue
+
+### Vercel (Recomendado)
+1. Conecta tu repositorio de GitHub a Vercel
+2. Configura las variables de entorno:
+   - `VITE_API_BASE_URL`: URL de tu backend en producción
+   - `VITE_FRONTEND_BASE_URL`: URL de tu frontend en Vercel
+3. Despliega automáticamente con cada push a main
+
+### Build Manual
+```bash
+npm run build
+```
+
+Los archivos optimizados se generan en la carpeta `dist/`.
+
+## 🤝 Contribución
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📝 Licencia
+
+Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE.md` para más detalles.
+
+## 📞 Soporte
+
+Para soporte técnico o preguntas sobre el proyecto, por favor contacta al equipo de desarrollo.
+
+---
+
+**Desarrollado con ❤️ para la gestión inteligente de condominios**
 
 Instalación:
 
@@ -145,26 +321,22 @@ Notas de seguridad:
 - Valida y verifica las firmas de webhook en el backend con `STRIPE_WEBHOOK_SECRET`.
 - Considera usar HttpOnly cookies para tokens si necesitas mayor seguridad.
 
+## 🤝 Contribución
 
-## Upgrade to PRO Version
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
 
-| Minimal Free                | [Minimal Pro](https://material-ui.com/store/items/minimal-dashboard/)                                   |
-| :-------------------------- | :------------------------------------------------------------------------------------------------------ |
-| **6** Pages                 | **70+** Pages                                                                                           |
-| **Partial** theme customize | **Fully** theme customize                                                                               |
-| -                           | **Next.js** version                                                                                     |
-| -                           | **TypeScript** version (Standard Plus and Extended license)                                             |
-| -                           | Design **Figma** file (Standard Plus and Extended license)                                              |
-| -                           | Authentication with **Amplify**, **Auth0**, **JWT**, **Firebase** and **Supabase**                      |
-| -                           | Light/dark mode, right-to-left, form validation... ([+more components](https://minimals.cc/components)) |
-| -                           | Complete users flows                                                                                    |
-| -                           | 1 year of free updates / 6 months of technical support                                                  |
-| -                           | Learn more: [Package & license](https://docs.minimals.cc/package)                                       |
+## 📝 Licencia
 
-## License
+Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE.md` para más detalles.
 
-Distributed under the [MIT](https://github.com/minimal-ui-kit/minimal.free/blob/main/LICENSE.md) license.
+## 📞 Soporte
 
-## Contact us
+Para soporte técnico o preguntas sobre el proyecto, por favor contacta al equipo de desarrollo.
 
-Email: support@minimals.cc
+---
+
+**Desarrollado con ❤️ para la gestión inteligente de condominios**
